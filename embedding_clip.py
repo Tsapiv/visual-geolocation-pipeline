@@ -29,7 +29,8 @@ if __name__ == '__main__':
     images = [preprocess(image).unsqueeze(0).to(device) for image in images]
 
     with torch.no_grad():
-        features = np.asarray([model.encode_image(image).numpy() for image in tqdm(images)])
+        features = [model.encode_image(image) for image in tqdm(images)]
+        features = np.concatenate([np.squeeze(feature_batch.cpu().numpy()).reshape((1, -1)) for feature_batch in features])
 
     identifier = args.model.replace('/', '-')
     np.save(os.path.join(args.output, f'{identifier}-features.npy'), features)

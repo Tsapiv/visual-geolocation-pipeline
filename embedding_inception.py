@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from PIL import Image
 from torchvision import transforms
 from torchvision.models.inception import Inception3, Inception_V3_Weights
+from tqdm import tqdm
 
 from utils import natural_ordering, match_paths
 
@@ -75,7 +76,7 @@ if __name__ == '__main__':
                         help='Name of the model')
     parser.add_argument('--input', required=True, type=str, help='Path to images folder')
     parser.add_argument('--output', required=False, type=str, default='./', help='Output folder')
-    parser.add_argument('--chunk-size', required=False, type=int, default=500, help='Size of chunk to process')
+    parser.add_argument('--chunk-size', required=False, type=int, default=100, help='Size of chunk to process')
 
     args = parser.parse_args()
 
@@ -87,16 +88,21 @@ if __name__ == '__main__':
     model.load_state_dict(Inception_V3_Weights.DEFAULT.get_state_dict(progress=True))
     model.to(device)
     model.eval()
+    print('Model is loaded')
 
     files = sorted(match_paths(args.input, r'.+\.(png|jpg|jpeg)'), key=natural_ordering)
+    file_chunks = [files[i:i + args.chunk_size] for i in range(0, len(files), args.chunk_size)]
 
-    images = [Image.open(file) for file in files]
-    images = [model.preprocess(image).to(device) for image in images]
-    images = torch.stack(images)
-
+    features = []
     with torch.no_grad():
-        features = [model(batch) for batch in torch.split(images, args.chunk_size)]
-        features = np.concatenate([np.squeeze(feature_batch.cpu().numpy()) for feature_batch in features])
+        for chunk in tqdm(file_chunks):
+            images = [Image.open(file) for file in chunk]
+            images = [model.preprocess(image) for image in images]
+            batch = torch.stack(images).to(device)
+            del images
+            feature_batch = model(batch)
+            features.append(np.squeeze(feature_batch.cpu().numpy()))
+        features = np.concatenate(features)
         identifier = args.model.replace('/', '-')
         np.save(os.path.join(args.output, f'{identifier}-features.npy'), features)
         json.dump(files, open(os.path.join(args.output, f'{identifier}-id.json'), 'w'), indent=4)

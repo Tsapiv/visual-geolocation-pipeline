@@ -25,7 +25,7 @@ if __name__ == '__main__':
     root = os.path.join(args.s, ",".join(map(str, args.p)))
     os.makedirs(os.path.join(root, 'photo'))
     meta = []
-    for coord in tqdm(get_coords_around_point(tuple(args.p), args.r, args.v)):
+    for coord in tqdm(get_coords_around_point(tuple(args.p), args.r, False)):
         try:
             params = dict(location=",".join(map(str, coord)), size='640x640', heading=0, key=cred['api-key'])
             metadata = requests.get(sign_url(META_REQUEST.format(**params), cred['secret']), stream=True).json()
@@ -37,6 +37,7 @@ if __name__ == '__main__':
                 response = requests.get(request)
                 if not response.ok:
                     print(response.status_code)
+                    continue
                 with open(os.path.join(root, 'photo', f'{params["location"]}_{heading}.jpg'), 'wb') as file:
                     file.write(response.content)
                 response.close()

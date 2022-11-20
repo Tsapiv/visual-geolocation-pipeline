@@ -1,4 +1,6 @@
 import re
+from argparse import ArgumentParser
+from typing import List
 
 import matplotlib
 
@@ -7,7 +9,6 @@ import matplotlib.pyplot as plt
 import osmnx as ox
 import numpy as np
 import json
-import cv2
 
 
 def remove_duplication(array):
@@ -21,49 +22,65 @@ def remove_duplication(array):
 
 
 if __name__ == '__main__':
-    features = np.squeeze(np.load('data/region_filtered_ViT-L14_features.npy'))
-    filenames = json.load(open('data/region_filtered_ViT-L14_filenames.json'))
-    metadata = json.load(open('data/region1_metadata.json'))
+    parser = ArgumentParser()
+    parser.add_argument('--input', required=True, type=str, help='Prefix to *_features.npy and *_id.json')
+    parser.add_argument('-k', required=False, type=int, default=3)
+    parser.add_argument('-v', action='store_true', help='Option for visualization')
+
+    args = parser.parse_args()
+
+    features = np.squeeze(np.load(f'{args.input}-features.npy'))
+    ids: List[str] = json.load(open(f'{args.input}-id.json'))
+
     g_city = ox.graph_from_place('Lviv', network_type='drive')
     print('Finish loading')
 
-    metadata = {node['pano_id']: ox.nearest_nodes(g_city, node['location']['lng'], node['location']['lat']) for node in
-                metadata}
-    n = 11
+    identifiers = np.asarray([list(map(float, id_.split('/')[-1].split('_')[0].split(','))) for id_ in ids])
+    nodes = np.asarray(ox.nearest_nodes(g_city, *(list(zip(*identifiers))[::-1])))
+
+    order = np.argsort(nodes)
+
+    n = 300
     # distance = np.squeeze(np.sqrt(np.sum(features - features[0], axis=-1) ** 2))
-    distance = features @ features[n] / (np.linalg.norm(features, axis=-1) * np.linalg.norm(features[n]))
+    similarity = features @ features[n] / (np.linalg.norm(features, axis=-1) * np.linalg.norm(features[n]))
 
-    indexes = np.argsort(distance)
-    distance = distance[indexes]
+    similarity = similarity[order]
+    nodes = nodes[order]
 
-    nodes = np.asarray([metadata[re.search(r".+/(.+)_\d{1,3}\.png", filename).group(1)] for filename in
-                        np.asarray(filenames)[indexes]])
 
-    # _, idx = np.unique(nodes[::-1], return_index=True)
-    # idx = (len(idx) - np.sort(idx)[::-1])[:10]
-    # idx = remove_duplication(nodes[::-1])
-    # idx = (len(idx) - idx[::-1])[-100:]
-    # nodes = nodes[idx]
-    # distance = distance[idx]
 
-    max_dist = np.max(distance)
-    min_dist = np.min(distance)
+
+
 
     nc = []
     ns = []
+    prev = None
+    ptr = 0
+    print(np.max(similarity))
     for i, node in enumerate(g_city.nodes):
-        idx = np.where(nodes == node)[0]
-
-        if len(idx) > 0:
-            ns.append(np.max(distance[idx]))
+        if node == nodes[ptr]:
+            ptr2 = ptr + 1
+            while ptr2 < len(nodes) and nodes[ptr] == nodes[ptr2]:
+                ptr2 += 1
+            sim = np.max(similarity[ptr: ptr2])
+            if np.isclose(sim, 1.0):
+                # nc.append('orange')
+                ns.append(sim)
+            else:
+                # nc.append('blue')
+                ns.append(sim)
+            ptr = min(ptr2, len(nodes) - 1)
         else:
-            ns.append(min_dist)
+            # nc.append('red')
+            ns.append(0)
+
 
     tmp = np.asarray(ns)
+    print(np.sort(tmp)[::-1][:20])
 
-    tmp = (tmp - np.min(tmp)) / (np.max(tmp) - np.min(tmp))
+    # tmp = (tmp - np.min(tmp)) / (np.max(tmp) - np.min(tmp))
 
-    tmp = tmp ** 4
+    tmp = tmp ** 12
 
     nc = [matplotlib.colors.to_hex(c) for c in plt.get_cmap('magma')(tmp)]
     print(nc)

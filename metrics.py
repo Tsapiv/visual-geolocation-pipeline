@@ -31,8 +31,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    features = np.squeeze(np.load(f'{args.input}_features.npy'))
-    ids = json.load(open(f'{args.input}_id.json'))
+    features = np.squeeze(np.load(f'{args.input}-features.npy'))
+    ids = json.load(open(f'{args.input}-id.json'))
     identifiers = np.asarray([re.search(r".+/(.+)_\d{1,3}\.(png|jpeg|jpg)", id_).group(1) for id_ in ids])
     _, indices = np.unique(identifiers, return_inverse=True)
     similarity_ordering = order_k(features, args.k + 1)
