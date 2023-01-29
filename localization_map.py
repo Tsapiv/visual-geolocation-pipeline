@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import osmnx as ox
 import numpy as np
 import json
+from sklearn.metrics.pairwise import cosine_distances, euclidean_distances, manhattan_distances
+
 
 
 def remove_duplication(array):
@@ -42,15 +44,11 @@ if __name__ == '__main__':
 
     n = 300
     # distance = np.squeeze(np.sqrt(np.sum(features - features[0], axis=-1) ** 2))
-    similarity = features @ features[n] / (np.linalg.norm(features, axis=-1) * np.linalg.norm(features[n]))
+    similarity = 1-cosine_distances(features, [features[n]])
+    # similarity = features @ features[n] / (np.linalg.norm(features, axis=-1) * np.linalg.norm(features[n]))
 
     similarity = similarity[order]
     nodes = nodes[order]
-
-
-
-
-
 
     nc = []
     ns = []
@@ -72,18 +70,19 @@ if __name__ == '__main__':
             ptr = min(ptr2, len(nodes) - 1)
         else:
             # nc.append('red')
-            ns.append(0)
+            ns.append(np.min(similarity))
 
 
     tmp = np.asarray(ns)
-    print(np.sort(tmp)[::-1][:20])
 
-    # tmp = (tmp - np.min(tmp)) / (np.max(tmp) - np.min(tmp))
+    selected = np.argsort(tmp)[:-args.k]
+    tmp[selected] = np.min(similarity)
+    # print(np.sort(tmp)[::-1][:20])
 
-    tmp = tmp ** 12
+    tmp = (tmp - np.min(tmp)) / (np.max(tmp) - np.min(tmp))
+
+    tmp = tmp ** 3
 
     nc = [matplotlib.colors.to_hex(c) for c in plt.get_cmap('magma')(tmp)]
-    print(nc)
-    print(tmp)
 
     ox.plot_graph(g_city, node_color=nc, node_size=tmp * 100, figsize=(12, 12), bgcolor="w")

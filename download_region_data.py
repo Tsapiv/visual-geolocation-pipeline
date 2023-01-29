@@ -17,6 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', nargs='+', type=float, required=True, help='Define point')
     parser.add_argument('-r', type=float, default=1000, help='Radius in meters')
     parser.add_argument('-s', default='data', type=str, help='Option for save')
+    parser.add_argument('--spacing', type=float, default=10, help='Distance between neighboring nodes in meters')
     parser.add_argument('--positions', type=int, default=1, help='Number of directions')
 
     args = parser.parse_args()
@@ -25,7 +26,7 @@ if __name__ == '__main__':
     root = os.path.join(args.s, ",".join(map(str, args.p)))
     os.makedirs(os.path.join(root, 'photo'))
     meta = []
-    for coord in tqdm(get_coords_around_point(tuple(args.p), args.r, False)):
+    for coord in tqdm(get_coords_around_point(tuple(args.p), args.r, args.spacing, False)):
         try:
             params = dict(location=",".join(map(str, coord)), size='640x640', heading=0, key=cred['api-key'])
             metadata = requests.get(sign_url(META_REQUEST.format(**params), cred['secret']), stream=True).json()

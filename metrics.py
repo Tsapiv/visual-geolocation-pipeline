@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.metrics.pairwise import cosine_distances
+from sklearn.metrics.pairwise import cosine_distances, euclidean_distances, manhattan_distances
 
 
 def map_k(y_true: np.ndarray, k: int):
