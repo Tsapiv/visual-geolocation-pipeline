@@ -1,11 +1,13 @@
 import json
+import time
 
 import matplotlib
 import numpy as np
+import geopandas as gpd
 import pyproj
 from matplotlib import pyplot as plt
 from shapely import ops
-from shapely.geometry import LineString
+from shapely.geometry import LineString, MultiPoint, Point
 from shapely.geometry.multilinestring import MultiLineString
 from shapely.ops import transform
 
@@ -27,24 +29,43 @@ def create_subgraph_v2(g, point, max_dist=1000):
     roi = ox.truncate_graph_polygon(g, polygon)
     return roi, ox.nearest_nodes(g, *point[::-1])
 
+# def redistribute_vertices(geom, distance):
+#     if geom.geom_type == 'LineString':
+#         num_vert = max(int(round(geom.length / distance)), 1)
+#         coords = [geom.interpolate(float(n) / num_vert, normalized=True)
+#              for n in range(0, num_vert + 1)]
+#         if len(coords) < 2:
+#             return None
+#         return LineString(coords)
+#     elif geom.geom_type == 'MultiLineString':
+#         parts = [redistribute_vertices(part, distance)
+#                  for part in geom.geoms]
+#         return type(geom)([p for p in parts if p is not None and not p.is_empty])
+#     else:
+#         raise ValueError('unhandled geometry %s', (geom.geom_type,))
+
 def redistribute_vertices(geom, distance):
-    if geom.geom_type == 'LineString':
-        num_vert = max(int(round(geom.length / distance)), 1)
-        coords = [geom.interpolate(float(n) / num_vert, normalized=True)
-             for n in range(0, num_vert + 1)]
-        if len(coords) < 2:
-            return None
-        return LineString(coords)
-    elif geom.geom_type == 'MultiLineString':
-        parts = [redistribute_vertices(part, distance)
-                 for part in geom.geoms]
-        return type(geom)([p for p in parts if p is not None and not p.is_empty])
-    else:
-        raise ValueError('unhandled geometry %s', (geom.geom_type,))
+    coords = []
+    for part in geom.geoms:
+        assert part.geom_type == 'LineString'
+        n_vert = int(part.length / distance)
+        if part.length < distance / 1.5:
+            continue
+        coords.append(Point(part.coords[0]))
+        coords.append(Point(part.coords[-1]))
+        for i in range(1, n_vert):
+            coords.append(part.interpolate(i / n_vert, normalized=True))
+    multipoint = MultiPoint(coords)
+    return multipoint
 
 
 def get_coords_around_point(point, radius, spacing, visualize=False):
-    g_city = ox.graph_from_place('Lviv', network_type='drive', simplify=False)
+    # g_city = ox.graph_from_place('Lviv', network_type='drive', simplify=False)
+    # ox.save_graphml(g_city, 'data/graph.graphml')
+    t = time.time()
+    g_city = ox.load_graphml('data/graph.graphml')
+    print(time.time() - t)
+
     subgraph, center = create_subgraph_v2(g_city, point, radius)
     coords = []
     geodesic = pyproj.Geod(ellps='WGS84')
@@ -84,7 +105,7 @@ def get_coords_around_point(point, radius, spacing, visualize=False):
     project_wgs84_to_utm = pyproj.Transformer.from_crs(wgs84, utm, always_xy=True).transform
     multi_line_utm = transform(project_wgs84_to_utm, multi_line_wgs84)
 
-    resampled_multi_line_utm = redistribute_vertices(multi_line_utm, 30)
+    resampled_multi_line_utm = redistribute_vertices(multi_line_utm, spacing)
 
     project_utm_to_wgs84 = pyproj.Transformer.from_crs(utm, wgs84, always_xy=True).transform
     resampled_multi_line_wgs84: MultiLineString = transform(project_utm_to_wgs84, resampled_multi_line_utm)
