@@ -16,13 +16,13 @@ if __name__ == '__main__':
     parser.add_argument('--rerank', action='store_true', help='Option for reranking')
     parser.add_argument('-v', action='store_true', help='Option for visualization')
 
-    args = parser.parse_args()
+    opt = parser.parse_args()
 
-    k = args.k + 1
+    k = opt.k + 1
     n = 300
 
-    gallery_features = np.squeeze(np.load(f'{args.input}-features.npy'))
-    ids: List[str] = json.load(open(f'{args.input}-id.json'))
+    gallery_features = np.squeeze(np.load(f'{opt.input}-features.npy'))
+    ids: List[str] = json.load(open(f'{opt.input}-id.json'))
 
     gallery_features /= np.linalg.norm(gallery_features, axis=-1, keepdims=True)
 
@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     identifiers = np.asarray(ids)
 
-    if args.rerank:
+    if opt.rerank:
         k2 = k
         k1 = 3 * k2
 
@@ -47,12 +47,13 @@ if __name__ == '__main__':
     identifiers = identifiers[order]
 
     anchor = cv2.imread(identifiers[0].item())
-
-    for filename in identifiers[1:]:
-        window = f'Compare'
-        cv2.namedWindow(window, cv2.WINDOW_NORMAL)
+    print(f'Rank 0: {identifiers[0].item()}')
+    window = f'Compare'
+    cv2.namedWindow(window, cv2.WINDOW_NORMAL)
+    cv2.setWindowProperty(window, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    for rank, filename in enumerate(identifiers[1:], 1):
+        print(f'Rank {rank}: {filename}')
         image = cv2.imread(filename.item())
         cv2.imshow(window, np.concatenate((anchor, image), axis=1))
         cv2.waitKey()
-        cv2.destroyAllWindows()
-        print(f'File: {filename}')
+    cv2.destroyAllWindows()
