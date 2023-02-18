@@ -1,8 +1,8 @@
 import os
-
+import open3d as o3d
 import numpy as np
 from itertools import combinations
-from pyproj import Geod
+from pyproj import Geod, Proj
 from scipy.spatial.transform import Rotation as R
 from position_refinement.LinearTriangulation import LinearTriangulation
 from position_refinement.PnPRansac import PnPRANSAC
@@ -10,6 +10,8 @@ from position_refinement.NonLinearPnP import NonLinearPnP
 from position_refinement.NonLinearTriangulation import NonLinearTriangulation
 
 PATH = 'dump_match_pairs'
+
+proj = Proj(proj='utm', zone=35, ellps='WGS84')
 
 geod = Geod(ellps='WGS84')
 
@@ -30,10 +32,12 @@ def parse_relative_motion(name: str):
     heading2_deg = float(heading2)
     lat2, lng2 = list(map(float, coords2.split('@')))
 
-    azimuths_deg, _, dist = geod.inv(lng1, lat1, lng2, lat2)
+    # azimuths_deg, _, dist = geod.inv(lng1, lat1, lng2, lat2)
 
-    T12 = np.array([np.sin(np.deg2rad(azimuths_deg)) * dist, 0, np.cos(np.deg2rad(azimuths_deg)) * dist])
-    R12 = R.from_rotvec(np.array([0, np.deg2rad(heading2_deg - heading1_deg), 0])).as_matrix()
+    # T12 = np.array([np.sin(np.deg2rad(azimuths_deg)) * dist, 0, np.cos(np.deg2rad(azimuths_deg)) * dist])
+    X, Y = proj(lng2, lat2)
+    T12 = np.array([X, 0, Y])
+    R12 = R.from_rotvec(np.array([0, np.deg2rad(heading2_deg), 0])).as_matrix()
 
     return T12, R12
 
@@ -47,24 +51,32 @@ if __name__ == '__main__':
             continue
         archives.append(np.load(dir_entry.path))
         extrinsics.append(parse_relative_motion(dir_entry.name))
+        print(extrinsics[-1])
 
     anchor_kpts = archives[0]['keypoints0']
 
     kpts = []
     matches = []
+    confidences = []
     common_matches = np.ones_like(archives[0]['matches'])
     for arch in archives:
         kpts.append(arch['keypoints1'])
-        matches.append(np.where(arch['matches'] == -1, 0, arch['matches']))
+        confidences.append(arch['match_confidence'])
+        matches.append(np.where(arch['match_confidence'] <= 0.85, 0, arch['matches']))
 
     pts3d = []
     pts2d = []
 
     for (match1, pts1, extrinsic1), (match2, pts2, extrinsic2) in combinations(zip(matches, kpts, extrinsics), 2):
+        if np.allclose(extrinsic1[0], extrinsic2[0]):
+            print('skipping points from same pose')
+            continue
         idxs = np.nonzero(match1 * match2)[0]
 
         if len(idxs) < 8:
+            print('skipping too few points')
             continue
+        print(len(idxs))
 
         kpts1 = pts1[match1[idxs]]
         kpts2 = pts2[match2[idxs]]
@@ -84,12 +96,23 @@ if __name__ == '__main__':
     pts3d = np.vstack(pts3d)
     pts2d = np.vstack(pts2d)
 
-    Rf, Tf = PnPRANSAC(K, pts2d, pts3d)
+    pcd = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(pts3d))
 
-    # Rf, Tf = NonLinearPnP(K, pts2d, pts3d, R0, T0)
+    o3d.io.write_point_cloud('pcd.ply', pcd)
+
+    # o3d.visualization.draw_geometries([pcd])
+
+    R0, T0 = PnPRANSAC(K, pts2d, pts3d)
+
+    print(R0, T0)
+    print(R.from_matrix(R0).as_rotvec(degrees=True))
+    print(np.linalg.norm(T0))
+
+    print('='*20)
+
+    Rf, Tf = NonLinearPnP(K, pts2d, pts3d, R0, T0)
 
     print(Rf, Tf)
-
     print(R.from_matrix(Rf).as_rotvec(degrees=True))
     print(np.linalg.norm(Tf))
 

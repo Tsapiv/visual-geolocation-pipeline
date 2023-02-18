@@ -5,7 +5,7 @@ from typing import List
 import cv2
 import numpy as np
 import torch
-from sklearn.metrics.pairwise import cosine_distances
+from sklearn.metrics.pairwise import cosine_distances, haversine_distances, manhattan_distances, euclidean_distances
 
 from gpu_re_ranking.gnn_reranking import gnn_reranking
 
@@ -19,7 +19,7 @@ if __name__ == '__main__':
     opt = parser.parse_args()
 
     k = opt.k + 1
-    n = 300
+    n = 4000
 
     gallery_features = np.squeeze(np.load(f'{opt.input}-features.npy'))
     ids: List[str] = json.load(open(f'{opt.input}-id.json'))
@@ -57,3 +57,6 @@ if __name__ == '__main__':
         cv2.imshow(window, np.concatenate((anchor, image), axis=1))
         cv2.waitKey()
     cv2.destroyAllWindows()
+
+    for filename in identifiers[1:]:
+        print(identifiers[0].split('/')[-1], filename.split('/')[-1])
