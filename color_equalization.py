@@ -49,8 +49,7 @@ def automatic_brightness_and_contrast(image, clip_hist_percent=1):
     return (auto_result, alpha, beta)
 
 
-image = cv2.imread('assets/test_photo/20230107_131324_org.jpg')
-cv2.imwrite('assets/test_photo/20230107_131324_org.jpg', image)
+image = cv2.imread('data/49.8443931@24.0254815/photo/49.84469872662@24.0191946461179_135.jpg')
 auto_result, alpha, beta = automatic_brightness_and_contrast(image)
 print('alpha', alpha)
 print('beta', beta)
