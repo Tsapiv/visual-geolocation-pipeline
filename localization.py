@@ -1,10 +1,11 @@
 import json
 from argparse import ArgumentParser
-from typing import List
+from typing import List, Union
 
 import cv2
 import numpy as np
 import torch
+from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_distances, haversine_distances, manhattan_distances, euclidean_distances
 
 from gpu_re_ranking.gnn_reranking import gnn_reranking
@@ -15,18 +16,31 @@ if __name__ == '__main__':
     parser.add_argument('-k', required=False, type=int, default=3)
     parser.add_argument('--rerank', action='store_true', help='Option for reranking')
     parser.add_argument('-v', action='store_true', help='Option for visualization')
+    parser.add_argument('-q', default='4000', type=str, help='Name/number of query picture')
+    parser.add_argument('--pca_dim', default=None, type=int, help='Number of PCA dimensions')
 
     opt = parser.parse_args()
-
-    k = opt.k + 1
-    n = 4000
-
-    gallery_features = np.squeeze(np.load(f'{opt.input}-features.npy'))
     ids: List[str] = json.load(open(f'{opt.input}-id.json'))
 
-    gallery_features /= np.linalg.norm(gallery_features, axis=-1, keepdims=True)
+    k = opt.k + 1
+    try:
+        n = int(opt.q)
+    except ValueError:
+        n = list(map(lambda x: x.split('/')[-1], ids)).index(opt.q.split('/')[-1])
+
+    gallery_features = np.squeeze(np.load(f'{opt.input}-features.npy'))
 
     query_feature = gallery_features[n].reshape(1, -1)
+    # query_feature = np.load('/home/tsapiv/Documents/diploma/deep-visual-geo-localization-benchmark/test/default/2023-02-26_15-20-36/radenovic_gldv1-query-features.npy').reshape(1, -1)
+
+    pca = None
+    if opt.pca_dim is not None:
+        pca = PCA(opt.pca_dim)
+        gallery_features = pca.fit_transform(gallery_features)
+        query_feature = pca.transform(query_feature)
+
+    gallery_features /= np.linalg.norm(gallery_features, axis=-1, keepdims=True)
+    query_feature /= np.linalg.norm(query_feature, axis=-1, keepdims=True)
 
     identifiers = np.asarray(ids)
 
