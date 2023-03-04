@@ -1,6 +1,7 @@
 import json
 import os
 from itertools import combinations
+from pprint import pprint
 from typing import List, Tuple, Optional, Union
 
 import cv2
@@ -102,22 +103,28 @@ def get_relative_pose(lat1, lng1, heading1_deg, lat2, lng2, heading2_deg):
     Y1 = elevation[(lat1, lng1)]
     Y2 = elevation[(lat2, lng2)]
 
-    X1, Z1 = proj(lng1, lat1)
-    X2, Z2 = proj(lng2, lat2)
+    # X1, Z1 = proj(lng1, lat1)
+    # X2, Z2 = proj(lng2, lat2)
 
     # X1, Z1 = proj(lat1, lng1)
     # X2, Z2 = proj(lat2, lng2)
     # change_sign = -1 if heading1_deg > 180 else 1  # for some reason if base angle 270 there is no need to negate but if base angle is 90 then sign needs to be changed
-    T12 = np.array([X2 - X1, (-Y2 + Y1), Z2 - Z1])[::-1]
+    # T12 = -np.array([X2 - X1, 0, Z2 - Z1])[::-1]
 
-    # azimuths_deg, _, dist = geod.inv(lng1, lat1, lng2, lat2)
-    #
-    # T12 = np.array([np.sin(np.deg2rad(azimuths_deg)) * dist, 0, np.cos(np.deg2rad(azimuths_deg)) * dist])[::1]
-    # T12[1] = (Y2 - Y1)
+    azimuths_deg, _, dist = geod.inv(lng1, lat1, lng2, lat2)
 
-    R12 = R.from_rotvec(np.array([0, -np.deg2rad((heading2_deg - heading1_deg) % 360), 0])).as_matrix()
+    angel = np.deg2rad(90-(azimuths_deg - heading1_deg))
 
-    return T12, R12
+    T12 = np.array([np.cos(angel) * dist, 0, np.sin(angel) * dist])
+    T12[1] = -(Y2 - Y1)
+
+    R12 = R.from_rotvec(np.array([0, np.deg2rad((heading2_deg - heading1_deg)), 0])).as_matrix()
+
+    # return T12, R12
+
+    TT = get_transformation(R12, T12)
+
+    return TT[:3, -1], TT[:3, :3]
 
 # def get_relative_pose(lat1, lng1, heading1_deg, lat2, lng2, heading2_deg):
 #     alt1 = elevation[(lat1, lng1)]
@@ -134,10 +141,12 @@ def get_relative_pose(lat1, lng1, heading1_deg, lat2, lng2, heading2_deg):
 
 
 def get_transformation(R, T):
-    tform = np.eye(4)
-    tform[:3, :3] = R
-    tform[:3, -1] = T
-    return tform
+    Rt = np.eye(4)
+    Tt = np.eye(4)
+    Rt[:3, :3] = R
+    Tt[:3, -1] = T
+    tmp = np.linalg.inv(Tt @ Rt)
+    return tmp
 
 
 def display_pcd(pcd: Union[np.ndarray, o3d.geometry.PointCloud]):
@@ -244,6 +253,22 @@ def calculate_pose(matches: List[np.ndarray],
 
 PATH = 'matches5'
 
+
+def draw_camera_setup(absolute_poses, reference_pose):
+    cameras = []
+    print(f'Reference pose: {reference_pose}')
+    for abs_pose in absolute_poses:
+        Tn, Rn = get_relative_pose(*reference_pose, *abs_pose)
+        Tnf = np.eye(4)
+        Tnf[:3, :3] = Rn
+        Tnf[:3, -1] = Tn
+        geometry = o3d.geometry.LineSet().create_camera_visualization(640, 640, get_K(640, 640, 90), Tnf)
+        # geometry.translate(Tn)
+        if reference_pose == abs_pose:
+            geometry.paint_uniform_color((1, 0, 0))
+        cameras.append(geometry)
+    return cameras
+
 def main():
     matches = []
     confidences = []
@@ -275,10 +300,12 @@ def main():
         confidences.append(data['match_confidence'])
         matches.append(data['matches'])
         Ks_g.append(get_K(640, 640, 90))
+    pprint(camera_poses_g)
+    o3d.visualization.draw_geometries([*draw_camera_setup(camera_poses_g, camera_poses_g[0]), o3d.geometry.TriangleMesh.create_coordinate_frame()])
 
     res = calculate_pose(matches, confidences, kpts_g, camera_poses_g, Ks_g,
                          kpt_q, K_q,
-                         confidence_thr=0.5, distance_thr=150)
+                         confidence_thr=0.7, distance_thr=150)
     if res is None:
         print('Fail')
     else:
