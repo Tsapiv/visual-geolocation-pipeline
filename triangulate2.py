@@ -7,66 +7,8 @@ from typing import List, Tuple, Optional, Union
 import cv2
 import numpy as np
 import open3d as o3d
-from pyproj import Geod, Proj
-from scipy.spatial.transform import Rotation as R
-
-WGS84_a = 6378137.0
-WGS84_b = 6356752.314245
-
-
-def ecef_from_lla(lat, lon, alt: float) -> Tuple[float, ...]:
-    """
-    Compute ECEF XYZ from latitude, longitude and altitude.
-
-    All using the WGS84 model.
-    Altitude is the distance to the WGS84 ellipsoid.
-    Check results here http://www.oc.nps.edu/oc2902w/coord/llhxyz.htm
-    """
-    a2 = WGS84_a ** 2
-    b2 = WGS84_b ** 2
-    lat = np.radians(lat)
-    lon = np.radians(lon)
-    L = 1.0 / np.sqrt(a2 * np.cos(lat) ** 2 + b2 * np.sin(lat) ** 2)
-    x = (a2 * L + alt) * np.cos(lat) * np.cos(lon)
-    y = (a2 * L + alt) * np.cos(lat) * np.sin(lon)
-    z = (b2 * L + alt) * np.sin(lat)
-    return x, y, z
-
-def ecef_from_topocentric_transform(lat, lon, alt: float) -> np.ndarray:
-    """
-    Transformation from a topocentric frame at reference position to ECEF.
-
-    The topocentric reference frame is a metric one with the origin
-    at the given (lat, lon, alt) position, with the X axis heading east,
-    the Y axis heading north and the Z axis vertical to the ellipsoid.
-    """
-    x, y, z = ecef_from_lla(lat, lon, alt)
-    sa = np.sin(np.radians(lat))
-    ca = np.cos(np.radians(lat))
-    so = np.sin(np.radians(lon))
-    co = np.cos(np.radians(lon))
-    return np.array(
-        [
-            [-so, -sa * co, ca * co, x],
-            [co, -sa * so, ca * so, y],
-            [0, ca, sa, z],
-            [0, 0, 0, 1],
-        ]
-    )
-
-def topocentric_from_lla(lat, lon, alt: float, reflat, reflon, refalt: float):
-    """
-    Transform from lat, lon, alt to topocentric XYZ.
-    """
-    T = np.linalg.inv(ecef_from_topocentric_transform(reflat, reflon, refalt))
-    x, y, z = ecef_from_lla(lat, lon, alt)
-    tx = T[0, 0] * x + T[0, 1] * y + T[0, 2] * z + T[0, 3]
-    ty = T[1, 0] * x + T[1, 1] * y + T[1, 2] * z + T[1, 3]
-    tz = T[2, 0] * x + T[2, 1] * y + T[2, 2] * z + T[2, 3]
-    return tx, ty, tz
-
-
-proj = Proj(proj='utm', zone=35, ellps='WGS84')
+from pyproj import Geod
+from scipy.spatial.transform import Rotation
 
 geod = Geod(ellps='WGS84')
 
@@ -99,63 +41,42 @@ def parse_camera_pose(name: str):
     return lat, lng, heading
 
 
-def get_relative_pose(lat1, lng1, heading1_deg, lat2, lng2, heading2_deg):
+def recover_camera_position(R, T):
+    C = -R.T @ T
+    return C
+
+
+def get_relative_C(lat1, lng1, heading1_deg, lat2, lng2, heading2_deg):
     Y1 = elevation[(lat1, lng1)]
-    Y2 = elevation[(lat2, lng2)]
-
-    # X1, Z1 = proj(lng1, lat1)
-    # X2, Z2 = proj(lng2, lat2)
-
-    # X1, Z1 = proj(lat1, lng1)
-    # X2, Z2 = proj(lat2, lng2)
-    # change_sign = -1 if heading1_deg > 180 else 1  # for some reason if base angle 270 there is no need to negate but if base angle is 90 then sign needs to be changed
-    # T12 = -np.array([X2 - X1, 0, Z2 - Z1])[::-1]
+    Y2 = elevation.get((lat2, lng2), Y1)
 
     azimuths_deg, _, dist = geod.inv(lng1, lat1, lng2, lat2)
 
-    angel = np.deg2rad(90-(azimuths_deg - heading1_deg))
+    angel = np.deg2rad(90 - (azimuths_deg - heading1_deg))
 
-    T12 = np.array([np.cos(angel) * dist, 0, np.sin(angel) * dist])
-    T12[1] = -(Y2 - Y1)
-
-    R12 = R.from_rotvec(np.array([0, np.deg2rad((heading2_deg - heading1_deg)), 0])).as_matrix()
-
-    # return T12, R12
-
-    TT = get_transformation(R12, T12)
-
-    return TT[:3, -1], TT[:3, :3]
-
-# def get_relative_pose(lat1, lng1, heading1_deg, lat2, lng2, heading2_deg):
-#     alt1 = elevation[(lat1, lng1)]
-#     alt2 = elevation.get((lat2, lng2), alt1)
-#
-#     X, Y, Z = topocentric_from_lla(lat2, lng2, alt2, lat1, lng1, alt1)
-#
-#     T12 = np.asarray([X, alt1 - alt2, Y])
-#
-#
-#     R12 = R.from_rotvec(np.array([0, -np.deg2rad(heading2_deg), 0])).as_matrix()
-#
-#     return T12, R12
+    C12 = np.array([np.cos(angel) * dist, -(Y2 - Y1), np.sin(angel) * dist])
+    return C12
 
 
-def get_transformation(R, T):
-    Rt = np.eye(4)
-    Tt = np.eye(4)
-    Rt[:3, :3] = R
-    Tt[:3, -1] = T
-    tmp = np.linalg.inv(Tt @ Rt)
-    return tmp
+def get_relative_E(lat1, lng1, heading1_deg, lat2, lng2, heading2_deg):
+    C12 = get_relative_C(lat1, lng1, heading1_deg, lat2, lng2, heading2_deg)
+
+    R12 = Rotation.from_rotvec(np.array([0, np.deg2rad(-(heading2_deg - heading1_deg)), 0])).as_matrix()
+
+    T12 = -R12 @ C12
+
+    return T12, R12
 
 
-def display_pcd(pcd: Union[np.ndarray, o3d.geometry.PointCloud]):
+def display_pcd(pcd: Union[np.ndarray, o3d.geometry.PointCloud], cameras, reference_camera):
     if isinstance(pcd, np.ndarray):
         pcd = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(pcd))
     vis = o3d.visualization.Visualizer()
     vis.create_window()
     vis.add_geometry(pcd)
     vis.add_geometry(o3d.geometry.TriangleMesh.create_coordinate_frame())
+    for g in draw_camera_setup(cameras, reference_camera):
+        vis.add_geometry(g)
     ctr: o3d.visualization.ViewControl = vis.get_view_control()
     ctr.change_field_of_view(step=90)
     par: o3d.camera.PinholeCameraParameters = ctr.convert_to_pinhole_camera_parameters()
@@ -163,7 +84,6 @@ def display_pcd(pcd: Union[np.ndarray, o3d.geometry.PointCloud]):
     ctr.convert_from_pinhole_camera_parameters(par)
     vis.run()
     vis.destroy_window()
-
 
 
 def calculate_pose(matches: List[np.ndarray],
@@ -174,12 +94,15 @@ def calculate_pose(matches: List[np.ndarray],
                    kpt_q: np.ndarray,
                    K_q: Optional[np.ndarray] = None,
                    confidence_thr: float = 0.89,
-                   distance_thr: float = 100):
+                   distance_thr: float = 100,
+                   reference_idx: int = None):
     confidences = np.asarray(confidences)
-
-    nonzero_confidence_indexes = np.nonzero(np.sum(confidences > 0.15, axis=0))[0]
-    max_confidence_distribution = np.argmax(confidences, axis=0)
-    most_confident_pose_idx = np.argmax(np.bincount(max_confidence_distribution[nonzero_confidence_indexes]))
+    if reference_idx is None:
+        nonzero_confidence_indexes = np.nonzero(np.sum(confidences > 0.1, axis=0))[0]
+        max_confidence_distribution = np.argmax(confidences, axis=0)
+        most_confident_pose_idx = np.argmax(np.bincount(max_confidence_distribution[nonzero_confidence_indexes]))
+    else:
+        most_confident_pose_idx = reference_idx
 
     base_pose = camera_poses_g[most_confident_pose_idx]
     print(f'Base pose: {base_pose}')
@@ -192,10 +115,10 @@ def calculate_pose(matches: List[np.ndarray],
 
     for idx1, idx2 in combinations(range(len(matches)), 2):
         match1, confidence1, pts1 = matches[idx1], confidences[idx1], kpts_g[idx1]
-        T1, R1 = get_relative_pose(*base_pose, *camera_poses_g[idx1])
+        T1, R1 = get_relative_E(*base_pose, *camera_poses_g[idx1])
 
         match2, confidence2, pts2 = matches[idx2], confidences[idx2], kpts_g[idx2]
-        T2, R2 = get_relative_pose(*base_pose, *camera_poses_g[idx2])
+        T2, R2 = get_relative_E(*base_pose, *camera_poses_g[idx2])
 
         if np.allclose(T1, T2):
             print('skipping points from same pose')
@@ -233,7 +156,7 @@ def calculate_pose(matches: List[np.ndarray],
         print('Too few 3d points')
         return
 
-    display_pcd(pts3d)
+    display_pcd(pts3d, camera_poses_g, base_pose)
 
     success, R_vec, t, inliers = cv2.solvePnPRansac(objectPoints=pts3d, imagePoints=pts2d, cameraMatrix=K_q,
                                                     distCoeffs=None,
@@ -251,23 +174,24 @@ def calculate_pose(matches: List[np.ndarray],
 
     return (T0, R0), base_pose
 
-PATH = 'matches5'
-
 
 def draw_camera_setup(absolute_poses, reference_pose):
     cameras = []
     print(f'Reference pose: {reference_pose}')
     for abs_pose in absolute_poses:
-        Tn, Rn = get_relative_pose(*reference_pose, *abs_pose)
+        Tn, Rn = get_relative_E(*reference_pose, *abs_pose)
         Tnf = np.eye(4)
         Tnf[:3, :3] = Rn
         Tnf[:3, -1] = Tn
         geometry = o3d.geometry.LineSet().create_camera_visualization(640, 640, get_K(640, 640, 90), Tnf)
-        # geometry.translate(Tn)
         if reference_pose == abs_pose:
             geometry.paint_uniform_color((1, 0, 0))
         cameras.append(geometry)
     return cameras
+
+
+PATH = 'matches6'
+
 
 def main():
     matches = []
@@ -289,6 +213,8 @@ def main():
 
         try:
             camera_pose_q = parse_camera_pose(match_name1)
+            # camera_pose_q = (49.84343056, 24.02655000, None)
+            # camera_pose_q = (*camera_pose_q[:-1], None)
         except Exception as e:
             pass
 
@@ -301,30 +227,35 @@ def main():
         matches.append(data['matches'])
         Ks_g.append(get_K(640, 640, 90))
     pprint(camera_poses_g)
-    o3d.visualization.draw_geometries([*draw_camera_setup(camera_poses_g, camera_poses_g[0]), o3d.geometry.TriangleMesh.create_coordinate_frame()])
 
-    res = calculate_pose(matches, confidences, kpts_g, camera_poses_g, Ks_g,
-                         kpt_q, K_q,
-                         confidence_thr=0.7, distance_thr=150)
-    if res is None:
-        print('Fail')
-    else:
-        (T0, R0), base_camera_pose = res
-        if camera_pose_q is not None:
-            T1, R1 = get_relative_pose(*base_camera_pose, *camera_pose_q)
-            R0 = R.from_matrix(R0).as_rotvec(degrees=True)
-            R1 = R.from_matrix(R1).as_rotvec(degrees=True)
-
-            print(f'T0: {T0}')
-            print(f'T1: {T1}')
-            print(f'R0: {R0}')
-            print(f'R1: {R1}')
-            print(f'Err: {np.linalg.norm(T0 - T1)}m')
-            print(f'Err: {R0 - R1}deg')
+    for i in range(len(matches)):
+        res = calculate_pose(matches, confidences, kpts_g, camera_poses_g, Ks_g,
+                             kpt_q, K_q,
+                             confidence_thr=0.2, distance_thr=200, reference_idx=i)
+        if res is None:
+            print('Fail')
         else:
-            print(f'T: {T0}')
-            print(f'R: {R.from_matrix(R0).as_rotvec(degrees=True)}')
-            print(f'Err: {np.linalg.norm(T0)}m')
+            (T0, R0), base_camera_pose = res
+            C0 = recover_camera_position(R0, T0)
+            if camera_pose_q is not None:
+                C1 = get_relative_C(*base_camera_pose, *camera_pose_q)
+                # T1, R1 = get_relative_pose(*base_camera_pose, *camera_pose_q)
+                # R0 = Rotation.from_matrix(R0).as_rotvec(degrees=True)
+                # R1 = Rotation.from_matrix(R1).as_rotvec(degrees=True)
+
+                # print(f'T0: {T0}')
+                # print(f'T1: {T1}')
+                # print(f'R0: {R0}')
+                # print(f'R1: {R1}')
+                # print(f'Err: {np.linalg.norm(T0 - T1)}m')
+                # print(f'Err: {R0 - R1}deg')
+                print(f'C0: {C0}')
+                print(f'C1: {C1}')
+                print(f'Err: {np.linalg.norm((C0 - C1)[::2])}m')
+            else:
+                print(f'T: {T0}')
+                print(f'R: {Rotation.from_matrix(R0).as_rotvec(degrees=True)}')
+                print(f'Err: {np.linalg.norm(T0)}m')
 
 
 if __name__ == '__main__':
