@@ -52,8 +52,8 @@ import matplotlib.cm as cm
 import torch
 
 
-from models.matching import Matching
-from models.utils import (compute_pose_error, compute_epipolar_error,
+from matching.matching import Matching
+from matching.utils import (compute_pose_error, compute_epipolar_error,
                           estimate_pose, make_matching_plot,
                           error_colormap, AverageTimer, pose_auc, read_image,
                           rotate_intrinsics, rotate_pose_inplane,

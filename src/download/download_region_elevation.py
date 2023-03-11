@@ -11,9 +11,9 @@ from utils import sign_url
 DATA_REQUEST = 'https://maps.googleapis.com/maps/api/elevation/json?locations={locations}&key={key}'
 
 
-def split(list_a, chunk_size):
-    for i in range(0, len(list_a), chunk_size):
-        yield list_a[i:i + chunk_size]
+def split(list_, chunk_size):
+    for i in range(0, len(list_), chunk_size):
+        yield list_[i:i + chunk_size]
 
 
 if __name__ == '__main__':
