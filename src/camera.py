@@ -26,6 +26,10 @@ class CameraIntrinsic:
     K: np.ndarray = field(default_factory=lambda: np.eye(3))
     distortion_coefficients: np.ndarray = field(default_factory=lambda: np.zeros(5))
 
+    def __post_init__(self):
+        self.K = np.asarray(self.K)
+        self.distortion_coefficients = np.asarray(self.distortion_coefficients)
+
 
 @dataclass
 class CameraMetadata:

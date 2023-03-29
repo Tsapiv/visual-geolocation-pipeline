@@ -21,7 +21,7 @@ def get_relative_pose(cam1: CameraExtrinsic, cam2: CameraExtrinsic) -> CameraExt
 
 
 def draw_camera(camera: Camera):
-    geometry = o3d.geometry.LineSet().create_camera_visualization(640, 640, camera.intrinsic.K,
+    geometry = o3d.geometry.LineSet().create_camera_visualization(int(camera.metadata.w), int(camera.metadata.h), camera.intrinsic.K,
                                                                   camera.extrinsic.E)
     return geometry
 
@@ -32,7 +32,7 @@ def visualize_scene(pcd: Union[np.ndarray, o3d.geometry.PointCloud], cameras: Li
     vis = o3d.visualization.Visualizer()
     vis.create_window()
     vis.add_geometry(pcd)
-    vis.add_geometry(o3d.geometry.TriangleMesh.create_coordinate_frame())
+    # vis.add_geometry(o3d.geometry.TriangleMesh.create_coordinate_frame())
     for camera in cameras:
         camera_geometry = draw_camera(camera)
         if np.allclose(camera.extrinsic.E, reference_camera.extrinsic.E):
@@ -76,10 +76,10 @@ def calculate_pose(matches: List[np.ndarray],
 
     for idx1, idx2 in combinations(range(len(matches)), 2):
         match1, confidence1, pts1 = matches[idx1], confidences[idx1], kpts[idx1]
-        pose1 = get_relative_pose(base_camera.extrinsic, cameras[idx1].extrinsic)
+        pose1 = cameras[idx1].extrinsic #get_relative_pose(base_camera.extrinsic, cameras[idx1].extrinsic)
 
         match2, confidence2, pts2 = matches[idx2], confidences[idx2], kpts[idx2]
-        pose2 = get_relative_pose(base_camera.extrinsic, cameras[idx2].extrinsic)
+        pose2 = cameras[idx2].extrinsic #get_relative_pose(base_camera.extrinsic, cameras[idx2].extrinsic)
 
         if np.allclose(pose1.T, pose2.T):
             verbose and print('skipping points from same pose')
@@ -104,7 +104,9 @@ def calculate_pose(matches: List[np.ndarray],
         X = cv2.triangulatePoints(P1, P2, kpts1.T, kpts2.T).T
         X = X / X[:, 3].reshape(-1, 1)
 
-        distance_outlier_mask = np.linalg.norm(X[:, :3], axis=-1) <= distance_thr
+        distance_outlier_mask1 = np.linalg.norm(X[:, :3] - cameras[idx1].extrinsic.C, axis=-1) <= distance_thr
+        distance_outlier_mask2 = np.linalg.norm(X[:, :3] - cameras[idx2].extrinsic.C, axis=-1) <= distance_thr
+        distance_outlier_mask = np.bitwise_or(distance_outlier_mask1, distance_outlier_mask2)
 
         pts_bitmap[idxs[distance_outlier_mask]] = True
         pts3d[idxs[distance_outlier_mask]] = (X[distance_outlier_mask])[:, :3]

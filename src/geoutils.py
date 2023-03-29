@@ -16,6 +16,29 @@ def intrinsics_from_metadata(metadata: CameraMetadata):
     return CameraIntrinsic(K=K)
 
 
+def extrinsic_from_metadata(metadata: CameraMetadata):
+    if metadata.E is None:
+        print('Fail to parse extrinsic')
+        return CameraExtrinsic()
+    E = np.asarray(metadata.E)
+
+    return CameraExtrinsic(R=E[:3, :3], T=E[:3, -1])
+
+def extrinsic_from_metadata_and_switch_axis(metadata: CameraMetadata):
+    E = np.asarray(metadata.E)
+    R = E[:3, :3]
+    C = E[:3, -1]
+    P = np.asarray([[1, 0, 0], [0, 0, 1], [0, 1, 0]])
+    R = P @ R
+    # C = P @ C
+    T = -R @ C
+    E = CameraExtrinsic(R=R, T=T).E
+    return CameraExtrinsic(R=E[:3, :3], T=E[:3, -1])
+    # P = np.asarray([[1, 0, 0], [0, 0, 1], [0, 1, 0]])
+    # return CameraExtrinsic(R=E[:3, :3], T=P @ E[:3, -1])
+
+
+
 def relative_camera_position_from_metadata(metadata1: CameraMetadata, metadata2: CameraMetadata):
     azimuths_deg, _, dist = GEOD.inv(metadata1.lng, metadata1.lat, metadata2.lng, metadata2.lat)
 

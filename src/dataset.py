@@ -21,61 +21,70 @@ class Dataset:
     def entries(self):
         return self.__entries
 
-    def __get_cached_descriptor(self, key: str):
+    def __get_descriptor(self, key: str, cache: bool):
         if key in self.__descriptors:
             return self.__descriptors[key]
         files = list(filter(lambda x: x.endswith('descriptor.npy'), os.listdir(os.path.join(self.__root, key))))
         assert len(files) == 1
         descriptor = np.load(os.path.join(self.__root, key, f'{self.__descriptor_type}_descriptor.npy'))
-        self.__descriptors[key] = descriptor
+        if cache:
+            self.__descriptors[key] = descriptor
         return descriptor
 
-    def __get_cached_image(self, key: str):
+    def __get_image(self, key: str, cache: bool):
         if key in self.__images:
             return self.__images[key]
 
         image = cv2.imread(os.path.join(self.__root, key, 'image.jpg'))
-        self.__images[key] = image
+        if cache:
+            self.__images[key] = image
         return image
 
-    def __get_cached_keypoint(self, key: str):
+    def __get_keypoint(self, key: str, cache: bool):
         if key in self.__keypoints:
             return self.__keypoints[key]
 
         npzfile = np.load(os.path.join(self.__root, key, 'keypoints.npz'))
         keypoint = {name: npzfile[name] for name in npzfile.files}
-        self.__keypoints[key] = keypoint
+        if cache:
+            self.__keypoints[key] = keypoint
         return keypoint
 
-    def __get_cached_metadata(self, key: str):
+    def __get_metadata(self, key: str, cache: bool):
         if key in self.__metadata:
             return self.__metadata[key]
 
         with open(os.path.join(self.__root, key, 'metadata.json')) as f:
             metadata = json.load(f)
-        self.__metadata[key] = metadata
+        if cache:
+            self.__metadata[key] = metadata
         return metadata
 
-    def image(self, key: Union[str, Iterable[str]]):
+    def image(self, key: Union[str, Iterable[str]], cache: bool = False):
         if isinstance(key, str):
-            return self.__get_cached_image(key)
+            return self.__get_image(key, cache)
         else:
-            return [self.__get_cached_image(e) for e in key]
+            return [self.__get_image(e, cache) for e in key]
 
-    def descriptor(self, key: Union[str, Iterable[str]]):
+    def descriptor(self, key: Union[str, Iterable[str]], cache: bool = False):
         if isinstance(key, str):
-            return self.__get_cached_descriptor(key)
+            return self.__get_descriptor(key, cache)
         else:
-            return [self.__get_cached_descriptor(e) for e in key]
+            return [self.__get_descriptor(e, cache) for e in key]
 
-    def keypoint(self, key: Union[str, Iterable[str]]):
+    def keypoint(self, key: Union[str, Iterable[str]], cache: bool = False):
         if isinstance(key, str):
-            return self.__get_cached_keypoint(key)
+            return self.__get_keypoint(key, cache)
         else:
-            return [self.__get_cached_keypoint(e) for e in key]
+            return [self.__get_keypoint(e, cache) for e in key]
 
-    def metadata(self, key: Union[str, Iterable[str]]):
+    def metadata(self, key: Union[str, Iterable[str]], cache: bool = False):
         if isinstance(key, str):
-            return self.__get_cached_metadata(key)
+            return self.__get_metadata(key, cache)
         else:
-            return [self.__get_cached_metadata(e) for e in key]
+            return [self.__get_metadata(e, cache) for e in key]
+
+    def get_subset(self, entries: Iterable[str]):
+        subset = self.__class__(self.__root, self.__descriptor_type)
+        subset.__entries = list(entries)
+        return subset
