@@ -108,8 +108,10 @@ class SuperPoint(nn.Module):
         'remove_borders': 4,
     }
 
-    def __init__(self, config):
+    def __init__(self, config=None):
         super().__init__()
+        if config is None:
+            config = {}
         self.config = {**self.default_config, **config}
 
         self.relu = nn.ReLU(inplace=True)

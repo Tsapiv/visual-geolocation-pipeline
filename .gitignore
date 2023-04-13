@@ -136,3 +136,7 @@ data/*
 cache/*
 credentials/*
 weights/
+matches*
+datasets
+test
+assets

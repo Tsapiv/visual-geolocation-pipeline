@@ -8,7 +8,7 @@ import numpy as np
 
 class Dataset:
 
-    def __init__(self, root: str, descriptor_type: str):
+    def __init__(self, root: str, descriptor_type: Optional[str] = None):
         self.__root = root
         self.__descriptor_type = descriptor_type
         self.__entries = [e.name for e in os.scandir(self.__root) if e.is_dir()]
@@ -21,11 +21,15 @@ class Dataset:
     def entries(self):
         return self.__entries
 
+    @property
+    def root(self):
+        return self.__root
+
     def __get_descriptor(self, key: str, cache: bool):
         if key in self.__descriptors:
             return self.__descriptors[key]
-        files = list(filter(lambda x: x.endswith('descriptor.npy'), os.listdir(os.path.join(self.__root, key))))
-        assert len(files) == 1
+        if self.__descriptor_type is None:
+            raise ValueError('Missing descriptor type')
         descriptor = np.load(os.path.join(self.__root, key, f'{self.__descriptor_type}_descriptor.npy'))
         if cache:
             self.__descriptors[key] = descriptor

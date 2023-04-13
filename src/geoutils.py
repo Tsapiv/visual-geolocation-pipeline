@@ -1,8 +1,10 @@
+from typing import Union, Dict
+
 import numpy as np
 from pyproj import Geod
 from scipy.spatial.transform import Rotation
 
-from camera import CameraMetadata, CameraIntrinsic, CameraExtrinsic
+from camera import CameraMetadata, CameraIntrinsic, CameraExtrinsic, Camera
 
 GEOD = Geod(ellps='WGS84')
 
@@ -10,8 +12,8 @@ GEOD = Geod(ellps='WGS84')
 def intrinsics_from_metadata(metadata: CameraMetadata):
     if metadata.K is not None:
         return CameraIntrinsic(K=metadata.K)
-    K = np.array([[metadata.w / np.tan(np.deg2rad(metadata.fov / 2)) / 2, 0, metadata.w / 2],
-                  [0, metadata.h / np.tan(np.deg2rad(metadata.fov / 2)) / 2, metadata.h / 2],
+    K = np.array([[max(metadata.w, metadata.h) / np.tan(np.deg2rad(metadata.fov / 2)) / 2, 0, metadata.w / 2],
+                  [0, max(metadata.w, metadata.h) / np.tan(np.deg2rad(metadata.fov / 2)) / 2, metadata.h / 2],
                   [0, 0, 1]])
     return CameraIntrinsic(K=K)
 
@@ -24,19 +26,13 @@ def extrinsic_from_metadata(metadata: CameraMetadata):
 
     return CameraExtrinsic(R=E[:3, :3], T=E[:3, -1])
 
-def extrinsic_from_metadata_and_switch_axis(metadata: CameraMetadata):
-    E = np.asarray(metadata.E)
-    R = E[:3, :3]
-    C = E[:3, -1]
-    P = np.asarray([[1, 0, 0], [0, 0, 1], [0, 1, 0]])
-    R = P @ R
-    # C = P @ C
-    T = -R @ C
-    E = CameraExtrinsic(R=R, T=T).E
-    return CameraExtrinsic(R=E[:3, :3], T=E[:3, -1])
-    # P = np.asarray([[1, 0, 0], [0, 0, 1], [0, 1, 0]])
-    # return CameraExtrinsic(R=E[:3, :3], T=P @ E[:3, -1])
 
+def camera_from_metadata(metadata: Union[Dict, CameraMetadata]):
+    if isinstance(metadata, dict):
+        metadata = CameraMetadata.from_kwargs(**metadata)
+    return Camera(intrinsic=intrinsics_from_metadata(metadata),
+                  extrinsic=extrinsic_from_metadata(metadata),
+                  metadata=metadata)
 
 
 def relative_camera_position_from_metadata(metadata1: CameraMetadata, metadata2: CameraMetadata):

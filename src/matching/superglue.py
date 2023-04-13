@@ -203,8 +203,10 @@ class SuperGlue(nn.Module):
         'match_threshold': 0.2,
     }
 
-    def __init__(self, config):
+    def __init__(self, config=None):
         super().__init__()
+        if config is None:
+            config = {}
         self.config = {**self.default_config, **config}
 
         self.kenc = KeypointEncoder(

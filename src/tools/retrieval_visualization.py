@@ -33,11 +33,17 @@ if __name__ == '__main__':
     print(topk)
     images = list(dataset.image(topk))
 
+    shapes = np.asarray(list(map(lambda x: x.shape[:2], images)))
+    max_h, max_w = np.max(shapes, axis=0)
     anchor = images[0]
+    anchor_padded = np.zeros((max_h, max_w, 3), dtype=np.uint8)
+    anchor_padded[:anchor.shape[0], :anchor.shape[1], :] = anchor
     window = f'Compare'
     cv2.namedWindow(window, cv2.WINDOW_NORMAL)
     cv2.setWindowProperty(window, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-    for rank, image in enumerate(images[1:], 1):
-        cv2.imshow(window, np.concatenate((anchor, image), axis=1))
+    for rank, image in enumerate(images[1:]):
+        image_padded = np.zeros((max_h, max_w, 3), dtype=np.uint8)
+        image_padded[:image.shape[0], :image.shape[1], :] = image
+        cv2.imshow(window, np.concatenate((anchor_padded, image_padded), axis=1))
         cv2.waitKey()
     cv2.destroyAllWindows()
