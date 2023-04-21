@@ -10,12 +10,13 @@ GEOD = Geod(ellps='WGS84')
 
 
 def intrinsics_from_metadata(metadata: CameraMetadata):
+    distortion_coefficients = np.zeros(5) if metadata.distortion_coefficients is None else metadata.distortion_coefficients
     if metadata.K is not None:
-        return CameraIntrinsic(K=metadata.K)
+        return CameraIntrinsic(K=metadata.K, distortion_coefficients=distortion_coefficients)
     K = np.array([[max(metadata.w, metadata.h) / np.tan(np.deg2rad(metadata.fov / 2)) / 2, 0, metadata.w / 2],
                   [0, max(metadata.w, metadata.h) / np.tan(np.deg2rad(metadata.fov / 2)) / 2, metadata.h / 2],
                   [0, 0, 1]])
-    return CameraIntrinsic(K=K)
+    return CameraIntrinsic(K=K, distortion_coefficients=distortion_coefficients)
 
 
 def extrinsic_from_metadata(metadata: CameraMetadata):

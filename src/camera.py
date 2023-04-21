@@ -42,6 +42,7 @@ class CameraMetadata:
     fov: float = None
     K: np.ndarray = None
     E: np.ndarray = None
+    distortion_coefficients: np.ndarray = None
 
     @classmethod
     def from_kwargs(cls, **kwargs):

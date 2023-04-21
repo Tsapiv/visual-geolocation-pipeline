@@ -4,13 +4,13 @@ import os.path
 import shutil
 from typing import Dict, Any
 from uuid import uuid4
-
+from scipy.spatial.transform import Rotation
 import cv2
 import numpy as np
 from tqdm import tqdm
 
 INPUT = '/home/tsapiv/Downloads/aachen_v1/'
-OUTPUT = 'datasets/aachen_v1_nighttime_test_resized'
+OUTPUT = 'datasets/aachen_v1_test'
 RESIZE = 800
 
 
@@ -49,30 +49,30 @@ if __name__ == '__main__':
             K = [[focal, 0, cx],
                  [0, focal, cy],
                  [0, 0, 1]]
-            metadata[filename] = dict(K=K, h=h, w=w)
+            metadata[filename] = dict(K=K, h=h, w=w, distortion_coefficients=[r, 0, 0, 0, 0])
 
-    extrinsic_path = os.path.join(INPUT, 'aachen_cvpr2018_db.nvm')
-    with open(extrinsic_path) as f:
-        next(f)
-        next(f)
-        n = int(f.readline().strip())
-        for _ in range(n):
-            line = f.readline().strip()
-            filename, *parameters = line.split(' ')
-            _, rw, rx, ry, rz, cx, cy, cz, _, _ = list(map(float, parameters))
-            C = np.asarray([cx, cy, cz])
-            R = from_quat_to_mat(np.asarray([rw, rx, ry, rz]))
-            E = np.eye(4)
-            T = -R @ C
-            E[:3, :3] = R
-            E[:3, -1] = T
-
-            metadata[filename].update(E=E.tolist())
+    # extrinsic_path = os.path.join(INPUT, 'aachen_cvpr2018_db.nvm')
+    # with open(extrinsic_path) as f:
+    #     next(f)
+    #     next(f)
+    #     n = int(f.readline().strip())
+    #     for _ in range(n):
+    #         line = f.readline().strip()
+    #         filename, *parameters = line.split(' ')
+    #         _, rw, rx, ry, rz, cx, cy, cz, _, _ = list(map(float, parameters))
+    #         C = np.asarray([cx, cy, cz])
+    #         R = Rotation.from_quat([rx, ry, rz, rw]).as_matrix()
+    #         E = np.eye(4)
+    #         T = -R @ C
+    #         E[:3, :3] = R
+    #         E[:3, -1] = T
+    #
+    #         metadata[filename].update(E=E.tolist())
     for image_path, meta in tqdm(metadata.items()):
         if not image_path.endswith('.jpg'):
             print('Wrong file format')
             continue
-        uuid = str(uuid4())
+        uuid = image_path.rstrip('.jpg').split('/')[-1]
         os.makedirs(os.path.join(OUTPUT, uuid))
         if RESIZE is None:
             shutil.copy(os.path.join(INPUT, image_path), os.path.join(OUTPUT, uuid, 'image.jpg'))

@@ -1,41 +1,46 @@
 import datetime
 import os
+import time
 
 import cv2
 import numpy as np
+from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 from dataset import Dataset
+from geometric_validation import find_cluster
 from geoutils import camera_from_metadata
 from keypoints_generation import generate_keypoints, tensor2numpy
 from keypoints_matching import match_keypoints
 from matching.superglue import SuperGlue
 from matching.superpoint import SuperPoint
-from pose_estimation import calculate_pose
+from pose_estimation import calculate_pose, ReconstructionPolicy
 from ranking.index import Index
 from utils import compare_images, make_matching_plot
 
 if __name__ == '__main__':
 
-    verbose = True
+    verbose = False
     k = 10
-    confidence_thr = 0.1
-    distance_thr = 100
+    confidence_thr = 0.4
+    points_distance_thr = 300
+    cameras_distance_thr = 30
     evaluate = True
 
-    # trainset = Dataset(root='datasets/aachen_v1_train', descriptor_type='radenovic_gldv1')
-    # testset = Dataset(root='datasets/aachen_v1_nighttime', descriptor_type='radenovic_gldv1')
+    trainset = Dataset(root='datasets/StreetTrain', descriptor_type='radenovic_gldv1')
+    testset = Dataset(root='datasets/StreetTest', descriptor_type='radenovic_gldv1')
 
-    dataset = Dataset(root='datasets/Lviv49.8443931@24.0254815', descriptor_type='radenovic_gldv1')
-
+    # dataset = Dataset(root='datasets/Lviv49.8443931@24.0254815', descriptor_type='radenovic_gldv1')
+    # dataset = Dataset(root='datasets/aachen_v1_train', descriptor_type='radenovic_gldv1')
+    #
     # train_entries, test_entries = train_test_split(dataset.entries, test_size=0.2)
-    err = np.load('test/lviv0/err.npy')
-    entries = np.load('test/lviv0/entries.npy')
-    test_entries = set(entries[err > 15])
-    train_entries = set(dataset.entries) - set(entries)
-
-    trainset = dataset.get_subset(train_entries)
-    testset = dataset.get_subset(test_entries)
+    # # err = np.load('test/lviv0/err.npy')
+    # entries = np.load('test/lviv0/entries.npy')
+    # test_entries = entries
+    # train_entries = set(dataset.entries) - set(entries)
+    #
+    # trainset = dataset.get_subset(train_entries)
+    # testset = dataset.get_subset(test_entries)
 
     super_point = SuperPoint()
     super_glue = SuperGlue(dict(weights='outdoor'))
@@ -57,6 +62,15 @@ if __name__ == '__main__':
             query_descriptor = testset.descriptor(entry)
 
             similar_entries = train_index.topk(query_descriptor, k, False)
+            cameras = [camera_from_metadata(m) for m in trainset.metadata(similar_entries, cache=True)]
+            valid = find_cluster(cameras, cameras_distance_thr)
+            if valid.size < 1:
+                verbose and print('Retrieved image are too far apart')
+                continue
+
+            similar_entries = similar_entries[valid]
+            cameras = np.asarray(cameras)[valid]
+
             keypoints = trainset.keypoint(similar_entries)
 
             if verbose:
@@ -87,16 +101,15 @@ if __name__ == '__main__':
                                        show_keypoints=True,
                                        opencv_display=True)
 
-            cameras = [camera_from_metadata(m) for m in trainset.metadata(similar_entries, cache=True)]
-
             ret = calculate_pose(matches,
                                  match_confidences,
                                  refined_keypoints,
                                  cameras,
                                  refined_query_keypoint,
                                  query_camera,
+                                 policy=ReconstructionPolicy.Displacement,
                                  confidence_thr=confidence_thr,
-                                 distance_thr=distance_thr,
+                                 distance_thr=points_distance_thr,
                                  verbose=verbose)
             if ret is None:
                 continue
@@ -105,12 +118,13 @@ if __name__ == '__main__':
             C0 = estimated_camera.extrinsic.C
             if evaluate:
                 C1 = query_camera.extrinsic.C
+                print(f'Estimated T: {estimated_camera.extrinsic.T}')
                 print(f'Estimated C: {C0}')
                 print(f'GT C: {C1}')
                 print(f'Err: {np.linalg.norm(C0 - C1)}m')
                 err.append(np.linalg.norm(C0 - C1))
-                gt_poses.append(query_camera.extrinsic)
-                estimated_poses.append(estimated_camera.extrinsic)
+                gt_poses.append(query_camera.extrinsic.E)
+                estimated_poses.append(estimated_camera.extrinsic.E)
                 retrieved_entries.append(similar_entries)
                 entries.append(entry)
             else:
@@ -118,6 +132,9 @@ if __name__ == '__main__':
                 print(f'Estimated C: {C0}')
                 print(f'Base camera C: {C1}')
                 print(f'Distance: {np.linalg.norm(C0 - C1)}m')
+                estimated_poses.append(estimated_camera.extrinsic.E)
+                retrieved_entries.append(similar_entries)
+                entries.append(entry)
         except Exception as e:
             print(e)
             raise
@@ -130,13 +147,8 @@ if __name__ == '__main__':
         estimated_poses = np.asarray(estimated_poses)
         entries = np.asarray(entries)
         retrieved_entries = np.asarray(retrieved_entries)
-        np.save(os.path.join(test_dir, 'err.npy'), err)
-        np.save(os.path.join(test_dir, 'gt.npy'), gt_poses)
-        np.save(os.path.join(test_dir, 'estimated.npy'), estimated_poses)
-        np.save(os.path.join(test_dir, 'retrieval.npy'), retrieved_entries)
-        np.save(os.path.join(test_dir, 'entries.npy'), entries)
-        print(np.median(err))
-        print(err.mean())
-        print(err.std())
-        print(np.max(err))
-        print(np.min(err))
+        err.size > 0 and np.save(os.path.join(test_dir, 'err.npy'), err)
+        gt_poses.size > 0 and np.save(os.path.join(test_dir, 'gt.npy'), gt_poses)
+        estimated_poses.size > 0 and np.save(os.path.join(test_dir, 'estimated.npy'), estimated_poses)
+        retrieved_entries.size > 0 and np.save(os.path.join(test_dir, 'retrieval.npy'), retrieved_entries)
+        entries.size > 0 and np.save(os.path.join(test_dir, 'entries.npy'), entries)

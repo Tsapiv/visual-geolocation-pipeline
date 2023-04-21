@@ -4,12 +4,13 @@ import os.path
 from uuid import uuid4
 
 import numpy as np
+import tqdm
 from scipy.spatial.transform import Rotation
 import cv2
 
 
-INPUT = '/home/tsapiv/Documents/diploma/KingsCollege/dataset_train.txt'
-OUTPUT = 'datasets/KingsCollegeTrain'
+INPUT = '/home/tsapiv/Documents/diploma/OldHospital/dataset_test.txt'
+OUTPUT = 'datasets/OldHospitalTest'
 
 w = 852
 h = 480
@@ -41,7 +42,7 @@ if __name__ == '__main__':
     with open(INPUT) as f:
         lines = f.readlines()[3:]
         base_dir = os.path.dirname(INPUT)
-        for line in lines:
+        for line in tqdm.tqdm(lines):
             image_path, *camera_pose = line.strip().split()
             camera_pose = list(map(float, camera_pose))
 
@@ -57,7 +58,7 @@ if __name__ == '__main__':
             resized = cv2.resize(image, (w, h), interpolation=cv2.INTER_CUBIC)
 
             metadata = dict(h=h, w=w, K=K, E=E.tolist())
-            uuid = str(uuid4())
+            uuid = image_path.replace('/', '_')
             os.makedirs(os.path.join(OUTPUT, uuid))
             cv2.imwrite(os.path.join(OUTPUT, uuid, 'image.jpg'), resized)
             json.dump(metadata, open(os.path.join(OUTPUT, uuid, 'metadata.json'), 'w'), indent=4)

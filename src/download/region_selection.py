@@ -60,10 +60,10 @@ def redistribute_vertices(geom, distance):
 
 
 def get_coords_around_point(point, radius, spacing, visualize=False):
-    # g_city = ox.graph_from_place('Lviv', network_type='drive', simplify=False)
+    g_city = ox.graph_from_place('Lviv', network_type='walk', simplify=False)
     # ox.save_graphml(g_city, 'data/graph.graphml')
     t = time.time()
-    g_city = ox.load_graphml('data/graph.graphml')
+    # g_city = ox.load_graphml('data/graph.graphml')
     print(time.time() - t)
 
     subgraph, center = create_subgraph_v2(g_city, point, radius)
