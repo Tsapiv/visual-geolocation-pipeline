@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, fields
-from typing import Optional, Union, Dict
+from typing import Optional
 
 import numpy as np
 
@@ -19,6 +19,10 @@ class CameraExtrinsic:
     @property
     def C(self):
         return -self.R.T @ self.T
+
+    @classmethod
+    def from_E(cls, E: np.ndarray):
+        return cls(R=E[:3, :3], T=E[:3, -1])
 
 
 @dataclass

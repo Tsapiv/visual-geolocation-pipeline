@@ -1,14 +1,23 @@
+import json
 import os
-import pathlib
+import uuid
 from argparse import ArgumentParser
+from copy import deepcopy
 
 import requests
 import yaml
 from tqdm import tqdm
 
+from dataset import Dataset
 from utils import sign_url
 
 DATA_REQUEST = 'https://maps.googleapis.com/maps/api/streetview?pano={pano}&size=640x640&fov={fov}&heading={heading}&key={key}&source=outdoor'
+
+def get_heading(name: str):
+    try:
+        return float(name.split('_')[-1])
+    except:
+        return None
 
 if __name__ == '__main__':
     parser = ArgumentParser()
@@ -19,18 +28,23 @@ if __name__ == '__main__':
     opt = parser.parse_args()
 
     cred = yaml.safe_load(open('credentials/google.yaml'))
-    metadata = yaml.safe_load(open(opt.metadata))
-    root = str(pathlib.Path(opt.metadata).parent)
-    os.makedirs(os.path.join(root, 'photo'), exist_ok=True)
+    dataset = Dataset(opt.metadata)
     params = dict(key=cred['api-key'], fov=opt.fov)
-    for pano in tqdm(metadata):
+    for entry in tqdm(dataset.entries):
         try:
-            params['pano'] = pano['pano_id']
+            metadata_base = dataset.metadata(entry)
+            params.update(metadata_base)
             for heading in range(0, 360, 360 // opt.headings):
-                lat, lng = pano['location']['lat'], pano['location']['lng']
-                photo_path = os.path.join(root, 'photo', f'{lat}@{lng}_{heading}.jpg')
-                if os.path.exists(photo_path):
-                    continue
+
+                entry_path = os.path.join(dataset.root, entry)
+
+                if os.path.exists(os.path.join(entry_path, 'image.jpg')):
+                    if metadata_base.get('azn', None) == heading:
+                        continue
+                    entry_path = os.path.join(dataset.root, f'{entry}_{heading}')
+                    os.makedirs(entry_path)
+
+                photo_path = os.path.join(entry_path, 'image.jpg')
 
                 params['heading'] = heading
                 request = DATA_REQUEST.format(**params)
@@ -42,5 +56,11 @@ if __name__ == '__main__':
                 with open(photo_path, 'wb') as file:
                     file.write(response.content)
                 response.close()
+
+                metadata = deepcopy(metadata_base)
+                metadata.update(dict(fov=opt.fov, w=640, h=640, azn=heading))
+                metadata_path = os.path.join(entry_path, 'metadata.json')
+                json.dump(metadata, open(metadata_path, 'w'), indent=4)
+
         except Exception as e:
             print(e)

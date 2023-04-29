@@ -3,9 +3,9 @@ import time
 
 import matplotlib
 import numpy as np
-import geopandas as gpd
 import pyproj
 from matplotlib import pyplot as plt
+from pyproj import Geod
 from shapely import ops
 from shapely.geometry import LineString, MultiPoint, Point
 from shapely.geometry.multilinestring import MultiLineString
@@ -29,20 +29,6 @@ def create_subgraph_v2(g, point, max_dist=1000):
     roi = ox.truncate_graph_polygon(g, polygon)
     return roi, ox.nearest_nodes(g, *point[::-1])
 
-# def redistribute_vertices(geom, distance):
-#     if geom.geom_type == 'LineString':
-#         num_vert = max(int(round(geom.length / distance)), 1)
-#         coords = [geom.interpolate(float(n) / num_vert, normalized=True)
-#              for n in range(0, num_vert + 1)]
-#         if len(coords) < 2:
-#             return None
-#         return LineString(coords)
-#     elif geom.geom_type == 'MultiLineString':
-#         parts = [redistribute_vertices(part, distance)
-#                  for part in geom.geoms]
-#         return type(geom)([p for p in parts if p is not None and not p.is_empty])
-#     else:
-#         raise ValueError('unhandled geometry %s', (geom.geom_type,))
 
 def redistribute_vertices(geom, distance):
     coords = []
@@ -59,34 +45,16 @@ def redistribute_vertices(geom, distance):
     return multipoint
 
 
-def get_coords_around_point(point, radius, spacing, visualize=False):
+def get_coords_around_point(point, radius, spacing, jitter=None, visualize=False):
     g_city = ox.graph_from_place('Lviv', network_type='walk', simplify=False)
-    # ox.save_graphml(g_city, 'data/graph.graphml')
+    # ox.save_graphml(g_city, 'data/graph3.graphml')
     t = time.time()
-    # g_city = ox.load_graphml('data/graph.graphml')
+    # g_city = ox.load_graphml('data/graph3.graphml')
     print(time.time() - t)
+    # fig, axis = ox.plot_graph(g_city, node_size=1, show=True, figsize=(12, 12), bgcolor="w")
 
     subgraph, center = create_subgraph_v2(g_city, point, radius)
     coords = []
-    geodesic = pyproj.Geod(ellps='WGS84')
-
-
-
-
-
-    # for u_id, v_id, _ in subgraph.edges:
-    #     u = subgraph.nodes[u_id]
-    #     v = subgraph.nodes[v_id]
-    #     d = geodesic.inv(u['y'], u['x'], v['y'], v['x'])[-1]
-    #     if d <= spacing:
-    #         # coords.append([u['y'], u['x']])
-    #         continue
-    #
-    #     r = geodesic.inv_intermediate(u['y'], u['x'], v['y'], v['x'], del_s=spacing, initial_idx=0, terminus_idx=0)
-    #
-    #     coords.extend(list(zip(r.lons, r.lats)))
-
-
     lines = []
 
     for u_id, v_id, _ in subgraph.edges:
@@ -113,6 +81,20 @@ def get_coords_around_point(point, radius, spacing, visualize=False):
     for linestring in resampled_multi_line_wgs84.geoms:
         coords.extend(np.asarray(linestring.coords.xy).T.tolist())
 
+    print(len(coords))
+    coords = list(set(map(tuple, coords)))
+    print(len(coords))
+
+    coords = np.asarray(coords)
+
+    if jitter is not None:
+        dist = np.random.uniform(*jitter, len(coords))
+        az = np.random.uniform(0, 360, len(coords))
+        g = Geod(ellps='WGS84')
+        lng, lat, _ = g.fwd(coords[:, 1], coords[:, 0], az, dist)
+
+        coords = np.concatenate([lat.reshape(-1, 1), lng.reshape(-1, 1)], axis=-1)
+
     if visualize:
         fig, axis = ox.plot_graph(g_city, node_size=1, show=False, figsize=(12, 12), bgcolor="w")
         plt.scatter(*(list(zip(*coords))[::-1]), c='b', marker='o', s=1)
@@ -123,15 +105,16 @@ def get_coords_around_point(point, radius, spacing, visualize=False):
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('-p', nargs='+', type=float, required=True, help='Define point')
+    parser.add_argument('-j', nargs='+', type=float, default=None, help='Jitter range in meters')
     parser.add_argument('-r', type=float, default=1000, help='Radius in meters')
     parser.add_argument('-v', action='store_true', help='Option for visualization')
     parser.add_argument('-s', default=None, type=str, help='Option for save')
     parser.add_argument('-d', default=30, type=int, help='Distance between coordinates in meters')
 
-
     opt = parser.parse_args()
 
-    coords = get_coords_around_point(tuple(opt.p), opt.r, opt.d, opt.v)
+    jitter = tuple(opt.j) if opt.j is not None else None
+    coords = get_coords_around_point(tuple(opt.p), opt.r, opt.d, jitter=jitter, visualize=opt.v)
     print(f'Total coordinates number: {len(coords)}')
     if opt.s:
         json.dump(coords, open(opt.s, 'w'), indent=4)

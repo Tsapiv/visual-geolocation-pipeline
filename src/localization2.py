@@ -1,6 +1,7 @@
 import datetime
 import os
 import time
+import traceback
 
 import cv2
 import numpy as np
@@ -27,20 +28,20 @@ if __name__ == '__main__':
     cameras_distance_thr = 30
     evaluate = True
 
-    trainset = Dataset(root='datasets/StreetTrain', descriptor_type='radenovic_gldv1')
-    testset = Dataset(root='datasets/StreetTest', descriptor_type='radenovic_gldv1')
-
-    # dataset = Dataset(root='datasets/Lviv49.8443931@24.0254815', descriptor_type='radenovic_gldv1')
+    # trainset = Dataset(root='datasets/Lviv49.8443931@24.0254815', descriptor_type='radenovic_gldv1')
+    # testset = Dataset(root='datasets/49.8440167@24.0240236', descriptor_type='radenovic_gldv1')
+    dataset = Dataset(root='datasets/LvivCenter49.841929@24.031554', descriptor_type='radenovic_gldv1')
     # dataset = Dataset(root='datasets/aachen_v1_train', descriptor_type='radenovic_gldv1')
     #
     # train_entries, test_entries = train_test_split(dataset.entries, test_size=0.2)
     # # err = np.load('test/lviv0/err.npy')
-    # entries = np.load('test/lviv0/entries.npy')
-    # test_entries = entries
-    # train_entries = set(dataset.entries) - set(entries)
+    entries = np.load('test_entries.npy')
+    test_entries = entries
+    train_entries = set(dataset.entries) - set(entries)
+    # np.save('test_entries.npy', test_entries)
     #
-    # trainset = dataset.get_subset(train_entries)
-    # testset = dataset.get_subset(test_entries)
+    trainset = dataset.get_subset(train_entries)
+    testset = dataset.get_subset(test_entries)
 
     super_point = SuperPoint()
     super_glue = SuperGlue(dict(weights='outdoor'))
@@ -61,10 +62,10 @@ if __name__ == '__main__':
             # skip step with descriptor calculation
             query_descriptor = testset.descriptor(entry)
 
-            similar_entries = train_index.topk(query_descriptor, k, False)
+            similar_entries = train_index.topk(query_descriptor, k, True)
             cameras = [camera_from_metadata(m) for m in trainset.metadata(similar_entries, cache=True)]
             valid = find_cluster(cameras, cameras_distance_thr)
-            if valid.size < 1:
+            if valid.size < 2:
                 verbose and print('Retrieved image are too far apart')
                 continue
 
@@ -136,8 +137,7 @@ if __name__ == '__main__':
                 retrieved_entries.append(similar_entries)
                 entries.append(entry)
         except Exception as e:
-            print(e)
-            raise
+            print(traceback.format_exc())
 
     if evaluate:
         test_dir = f'test/{datetime.datetime.now().isoformat()}'

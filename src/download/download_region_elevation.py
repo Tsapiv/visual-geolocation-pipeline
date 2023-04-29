@@ -6,7 +6,7 @@ import requests
 import yaml
 from tqdm import tqdm
 
-from utils import sign_url
+from dataset import Dataset
 
 DATA_REQUEST = 'https://maps.googleapis.com/maps/api/elevation/json?locations={locations}&key={key}'
 
@@ -19,21 +19,25 @@ def split(list_, chunk_size):
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--dir', type=str, required=True, help='Path to dir with images')
-    parser.add_argument('--output', type=str, default='./', help='Path to save json')
 
     opt = parser.parse_args()
 
     cred = yaml.safe_load(open('credentials/google.yaml'))
 
-    coords = list(set(
-        map(lambda y: y.split('_')[0].replace('@', ','), map(lambda x: x.name, os.scandir(opt.dir)))))
-    meta = []
-    for coord in tqdm(list(split(coords, 200))):
+    dataset = Dataset(opt.dir)
+
+    coords = [f"{m['lat']},{m['lng']}" for m in dataset.metadata(dataset.entries, cache=True)]
+
+    metadata = []
+    for coord in tqdm(list(split(coords, 300))):
         try:
             params = dict(locations="|".join(coord), key=cred['api-key'])
-            response = requests.get(DATA_REQUEST.format(**params))
-            metadata = response.json()
-            meta.extend(metadata['results'])
+            response = requests.get(DATA_REQUEST.format(**params)).json()
+            metadata.extend(response['results'])
         except Exception as e:
             print(e)
-    json.dump(meta, open(os.path.join(opt.output, 'elevation.json'), 'w'), indent=4)
+
+    for i, entry in enumerate(dataset.entries):
+        m = dataset.metadata(entry)
+        m.update(alt=metadata[i]['elevation'])
+        json.dump(m, open(os.path.join(dataset.root, entry, 'metadata.json'), 'w'), indent=4)
