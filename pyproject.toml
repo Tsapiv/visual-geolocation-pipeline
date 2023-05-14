@@ -1,0 +1,29 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.poetry]
+name = "pysight"
+version = "0.1.0"
+description = ""
+authors = [
+    "Volodymyr Tsapiv <volodja.tsv@gmail.com>",
+]
+maintainers = [
+    "Volodymyr Tsapiv <volodja.tsv@gmail.com>",
+
+]
+license = "Proprietary"
+
+readme = "README.md"
+
+packages = [
+    { include = "pysight", from = "src" }
+]
+include = [
+    { path = "tests", format = "sdist" }
+]
+
+keywords = ["GPS", "visual", "localization"]
+

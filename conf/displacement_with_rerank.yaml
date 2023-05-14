@@ -1,0 +1,7 @@
+k: 10
+confidence_thr: 0.4
+points_distance_thr: 300
+cameras_distance_thr: 30
+rerank: true
+policy: DISPLACEMENT
+verbose: false
