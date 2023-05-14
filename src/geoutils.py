@@ -22,7 +22,7 @@ def intrinsics_from_metadata(metadata: CameraMetadata):
 def extrinsic_from_metadata(metadata: CameraMetadata):
     if metadata.E is None:
         print('Fail to parse extrinsic')
-        return CameraExtrinsic()
+        return None
     E = np.asarray(metadata.E)
 
     return CameraExtrinsic(R=E[:3, :3], T=E[:3, -1])

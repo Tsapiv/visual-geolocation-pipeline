@@ -2,13 +2,13 @@ from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
 import numpy as np
-from pyproj import Geod
 from sklearn.metrics.pairwise import cosine_distances, euclidean_distances
 from sklearn.model_selection import train_test_split
 
 from camera import CameraMetadata
 from dataset import Dataset
 from geoutils import extrinsic_from_metadata
+from matching.utils import angle_error_mat
 
 
 def map_k(y_true: np.ndarray, k: int):
@@ -26,17 +26,12 @@ def order_k(distances: np.ndarray, k: int):
                               axis=-1)
 
 
-def order_by_distance(lats, lngs):
-    geod = Geod(ellps='WGS84')
-
-    X, Y = np.mgrid[0:len(lats):1, 0:len(lats):1]
-
-    _, _, dists = geod.inv(lngs[X.ravel()], lats[X.ravel()], lngs[Y.ravel()], lats[Y.ravel()])
-
-    dist_mat = np.zeros((len(lats), len(lats)))
-
-    dist_mat[X.ravel(), Y.ravel()] = dists
-    return dist_mat
+def angular_distances(mats1, mats2):
+    angles = np.zeros((len(mats1), len(mats2)))
+    for i in range(len(mats1)):
+        for j in range(len(mats2)):
+            angles[i, j] = angle_error_mat(mats1[i], mats2[j])
+    return angles
 
 
 if __name__ == '__main__':
@@ -45,7 +40,8 @@ if __name__ == '__main__':
     parser.add_argument('--input2', default=None, type=str, help='Path to test dataset')
     parser.add_argument('--descriptor_type', required=True, type=str, help='Prefix of descriptor filename')
     parser.add_argument('-k', required=False, type=int, default=3, help='k in map@k')
-    parser.add_argument('-k2', required=False, type=int, default=23, help='Sets k closest in the trainset by distance between cameras')
+    parser.add_argument('-k2', required=False, type=int, default=23,
+                        help='Sets k closest in the trainset by distance between cameras')
     parser.add_argument('-s', '--split', type=float, default=0.2, help='Test size split')
 
     opt = parser.parse_args()
@@ -63,14 +59,24 @@ if __name__ == '__main__':
 
         train_entries, test_entries = trainset.entries, testset.entries
 
+    train_extrinsic = [extrinsic_from_metadata(CameraMetadata.from_kwargs(**m)) for m in
+                       trainset.metadata(train_entries)]
+    test_extrinsic = [extrinsic_from_metadata(CameraMetadata.from_kwargs(**m)) for m in testset.metadata(test_entries)]
 
-    train_coords = np.asarray([extrinsic_from_metadata(CameraMetadata.from_kwargs(**m)).C for m in trainset.metadata(train_entries)])
-    test_coords = np.asarray([extrinsic_from_metadata(CameraMetadata.from_kwargs(**m)).C for m in testset.metadata(test_entries)])
+    train_coords = np.asarray(list(map(lambda x: x.C, train_extrinsic)))
+    test_coords = np.asarray(list(map(lambda x: x.C, test_extrinsic)))
+
+    train_rotations = np.asarray(list(map(lambda x: x.R, train_extrinsic)))
+    test_rotations = np.asarray(list(map(lambda x: x.R, test_extrinsic)))
 
     train_features = np.concatenate([features.reshape(1, -1) for features in trainset.descriptor(train_entries)])
     test_features = np.concatenate([features.reshape(1, -1) for features in testset.descriptor(test_entries)])
 
     distances = euclidean_distances(test_coords, train_coords)
+    angles = angular_distances(test_rotations, train_rotations)
+
+    distances[angles > 90] = np.inf
+
     similarity = cosine_distances(test_features, train_features)
 
     distance_ordering = order_k(distances, opt.k2)

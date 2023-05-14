@@ -83,7 +83,7 @@ def compare_images(query_image: np.ndarray, retrieved_images: List[np.ndarray]):
     cv2.destroyAllWindows()
 
 
-def make_matching_plot(image0, image1, kpts0, kpts1, matches, match_confidences, text='Matches', path=None,
+def make_matching_plot(image0, image1, kpts0, kpts1, matches, match_confidences, text=(), path=None,
                             show_keypoints=False, margin=10,
                             opencv_display=False, opencv_title='',
                             small_text=()):

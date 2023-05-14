@@ -1,8 +1,10 @@
 import json
 import time
+from argparse import ArgumentParser
 
 import matplotlib
 import numpy as np
+import osmnx as ox
 import pyproj
 from matplotlib import pyplot as plt
 from pyproj import Geod
@@ -12,10 +14,6 @@ from shapely.geometry.multilinestring import MultiLineString
 from shapely.ops import transform
 
 matplotlib.use('TkAgg')
-import osmnx as ox
-from argparse import ArgumentParser
-
-POINT = (49.8440167, 24.0240236)  # (49.8348382, 24.0348626)
 
 
 def create_subgraph_v1(g, point, max_dist=1000):
@@ -81,11 +79,7 @@ def get_coords_around_point(point, radius, spacing, jitter=None, visualize=False
     for linestring in resampled_multi_line_wgs84.geoms:
         coords.extend(np.asarray(linestring.coords.xy).T.tolist())
 
-    print(len(coords))
-    coords = list(set(map(tuple, coords)))
-    print(len(coords))
-
-    coords = np.asarray(coords)
+    coords = np.asarray(list(set(map(tuple, coords))))
 
     if jitter is not None:
         dist = np.random.uniform(*jitter, len(coords))
@@ -96,7 +90,7 @@ def get_coords_around_point(point, radius, spacing, jitter=None, visualize=False
         coords = np.concatenate([lat.reshape(-1, 1), lng.reshape(-1, 1)], axis=-1)
 
     if visualize:
-        fig, axis = ox.plot_graph(g_city, node_size=1, show=False, figsize=(12, 12), bgcolor="w")
+        fig, axis = ox.plot_graph(g_city, node_size=0, show=False, figsize=(12, 12), bgcolor="w")
         plt.scatter(*(list(zip(*coords))[::-1]), c='b', marker='o', s=1)
         plt.show()
     return coords

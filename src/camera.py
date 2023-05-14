@@ -73,7 +73,7 @@ class CameraMetadata:
 @dataclass
 class Camera:
     intrinsic: CameraIntrinsic
-    extrinsic: CameraExtrinsic
+    extrinsic: Optional[CameraExtrinsic] = None
     metadata: Optional[CameraMetadata] = None
 
     @property

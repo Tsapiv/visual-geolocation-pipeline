@@ -3,7 +3,7 @@ import os.path
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-INPUT_DIR = 'test/aachen_expansion_policy_rerank'
+INPUT_DIR = 'test/aachen_1_expansion_policy_no_rerank'
 
 
 def convert_transformation(E: np.ndarray):

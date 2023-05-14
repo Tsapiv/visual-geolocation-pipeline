@@ -28,17 +28,18 @@ if __name__ == '__main__':
     cameras_distance_thr = 30
     evaluate = True
 
-    # trainset = Dataset(root='datasets/Lviv49.8443931@24.0254815', descriptor_type='radenovic_gldv1')
-    # testset = Dataset(root='datasets/49.8440167@24.0240236', descriptor_type='radenovic_gldv1')
+    # trainset = Dataset(root='datasets/aachen_v1_1_train', descriptor_type='radenovic_gldv1')
+    # testset = Dataset(root='datasets/aachen_v1_1_test', descriptor_type='radenovic_gldv1')
     dataset = Dataset(root='datasets/LvivCenter49.841929@24.031554', descriptor_type='radenovic_gldv1')
     # dataset = Dataset(root='datasets/aachen_v1_train', descriptor_type='radenovic_gldv1')
     #
     # train_entries, test_entries = train_test_split(dataset.entries, test_size=0.2)
     # # err = np.load('test/lviv0/err.npy')
     entries = np.load('test_entries.npy')
+    # tmp = np.load('test/lviv_center_displacement_policy_no_rerank/entries.npy')
     test_entries = entries
     train_entries = set(dataset.entries) - set(entries)
-    # np.save('test_entries.npy', test_entries)
+    # np.save('Lviv49.8443931@24.0254815_test_entries.npy', test_entries)
     #
     trainset = dataset.get_subset(train_entries)
     testset = dataset.get_subset(test_entries)
@@ -99,7 +100,7 @@ if __name__ == '__main__':
                                        refined_keypoints[i],
                                        matches[i],
                                        match_confidences[i],
-                                       show_keypoints=True,
+                                       show_keypoints=False,
                                        opencv_display=True)
 
             ret = calculate_pose(matches,
@@ -108,7 +109,7 @@ if __name__ == '__main__':
                                  cameras,
                                  refined_query_keypoint,
                                  query_camera,
-                                 policy=ReconstructionPolicy.Displacement,
+                                 policy=ReconstructionPolicy.Expansion,
                                  confidence_thr=confidence_thr,
                                  distance_thr=points_distance_thr,
                                  verbose=verbose)
@@ -118,13 +119,14 @@ if __name__ == '__main__':
 
             C0 = estimated_camera.extrinsic.C
             if evaluate:
-                C1 = query_camera.extrinsic.C
-                print(f'Estimated T: {estimated_camera.extrinsic.T}')
-                print(f'Estimated C: {C0}')
-                print(f'GT C: {C1}')
-                print(f'Err: {np.linalg.norm(C0 - C1)}m')
-                err.append(np.linalg.norm(C0 - C1))
-                gt_poses.append(query_camera.extrinsic.E)
+                if query_camera.extrinsic is not None:
+                    C1 = query_camera.extrinsic.C
+                    print(f'Estimated T: {estimated_camera.extrinsic.T}')
+                    print(f'Estimated C: {C0}')
+                    print(f'GT C: {C1}')
+                    print(f'Err: {np.linalg.norm(C0 - C1)}m')
+                    err.append(np.linalg.norm(C0 - C1))
+                    gt_poses.append(query_camera.extrinsic.E)
                 estimated_poses.append(estimated_camera.extrinsic.E)
                 retrieved_entries.append(similar_entries)
                 entries.append(entry)

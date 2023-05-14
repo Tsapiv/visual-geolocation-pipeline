@@ -53,6 +53,36 @@ def visualize_scene(pcd: Union[np.ndarray, o3d.geometry.PointCloud], cameras: Li
     vis.destroy_window()
 
 
+def visualize_reconstruction(pcd: Union[np.ndarray, o3d.geometry.PointCloud], cameras: List[Camera], gt_camera: Camera,
+                             estimated_camera: Camera):
+    if isinstance(pcd, np.ndarray):
+        pcd = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(pcd))
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()
+    vis.add_geometry(pcd)
+    for camera in cameras:
+        if np.allclose(camera.extrinsic.C, gt_camera.extrinsic.C):
+            continue
+        vis.add_geometry(draw_camera(camera))
+
+    if gt_camera.extrinsic is not None:
+        gt_camera_geom = draw_camera(gt_camera)
+        gt_camera_geom.paint_uniform_color((0, 1, 0))
+        vis.add_geometry(gt_camera_geom)
+
+    estimated_camera_geom = draw_camera(estimated_camera)
+    estimated_camera_geom.paint_uniform_color((1, 0, 0))
+    vis.add_geometry(estimated_camera_geom)
+
+    ctr: o3d.visualization.ViewControl = vis.get_view_control()
+    ctr.change_field_of_view(step=90)
+    par: o3d.camera.PinholeCameraParameters = ctr.convert_to_pinhole_camera_parameters()
+    par.extrinsic = estimated_camera.extrinsic.E
+    ctr.convert_from_pinhole_camera_parameters(par)
+    vis.run()
+    vis.destroy_window()
+
+
 def triangulate_with_estimated_pose(kpts1: np.ndarray,
                                     kpts2: np.ndarray,
                                     cam1: Camera,
@@ -68,9 +98,11 @@ def triangulate_with_estimated_pose(kpts1: np.ndarray,
     mkpts2 = kpts2[matches]
     try:
         mkpts1_norm = np.ascontiguousarray(
-            cv2.undistortPoints(np.expand_dims(mkpts1, axis=1), cameraMatrix=cam1.intrinsic.K, distCoeffs=None))
+            cv2.undistortPoints(np.expand_dims(mkpts1, axis=1), cameraMatrix=cam1.intrinsic.K,
+                                distCoeffs=cam1.intrinsic.distortion_coefficients))
         mkpts2_norm = np.ascontiguousarray(
-            cv2.undistortPoints(np.expand_dims(mkpts2, axis=1), cameraMatrix=cam2.intrinsic.K, distCoeffs=None))
+            cv2.undistortPoints(np.expand_dims(mkpts2, axis=1), cameraMatrix=cam2.intrinsic.K,
+                                distCoeffs=cam2.intrinsic.distortion_coefficients))
 
         E, mask = cv2.findEssentialMat(mkpts1_norm, mkpts2_norm, focal=1.0, pp=(0., 0.), method=cv2.RANSAC, prob=0.999,
                                        threshold=1.0)
@@ -142,7 +174,7 @@ def calculate_pose(matches: List[np.ndarray],
         match2, confidence2, pts2 = matches[idx2], confidences[idx2], kpts[idx2]
         pose2 = cameras[idx2].extrinsic  # get_relative_pose(base_camera.extrinsic, cameras[idx2].extrinsic)
 
-        if np.allclose(pose1.T, pose2.T):
+        if np.allclose(pose1.C, pose2.C):
             verbose and print('skipping points from same pose')
             continue
 
@@ -163,8 +195,10 @@ def calculate_pose(matches: List[np.ndarray],
         P1 = get_projection_matrix(cameras[idx1].intrinsic, pose1)
         P2 = get_projection_matrix(cameras[idx2].intrinsic, pose2)
 
-        kpts1 = np.squeeze(cv2.undistortImagePoints(kpts1.T, cameraMatrix=cameras[idx1].intrinsic.K, distCoeffs=cameras[idx1].intrinsic.distortion_coefficients))
-        kpts2 = np.squeeze(cv2.undistortImagePoints(kpts2.T, cameraMatrix=cameras[idx2].intrinsic.K, distCoeffs=cameras[idx2].intrinsic.distortion_coefficients))
+        kpts1 = np.squeeze(cv2.undistortImagePoints(kpts1.T, cameraMatrix=cameras[idx1].intrinsic.K,
+                                                    distCoeffs=cameras[idx1].intrinsic.distortion_coefficients))
+        kpts2 = np.squeeze(cv2.undistortImagePoints(kpts2.T, cameraMatrix=cameras[idx2].intrinsic.K,
+                                                    distCoeffs=cameras[idx2].intrinsic.distortion_coefficients))
 
         X = cv2.triangulatePoints(P1, P2, kpts1.T, kpts2.T).T
         X = X / X[:, 3].reshape(-1, 1)
@@ -209,5 +243,7 @@ def calculate_pose(matches: List[np.ndarray],
     estimated_camera = deepcopy(camera)
 
     estimated_camera.extrinsic = CameraExtrinsic(R=R, T=T)
+
+    verbose and visualize_reconstruction(pts3d, cameras, camera, estimated_camera)
 
     return estimated_camera, base_camera
