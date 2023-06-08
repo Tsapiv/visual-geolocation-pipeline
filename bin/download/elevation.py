@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 
-from pysight.download.elevation import download_elevation
+from geonavpy.download.elevation import download_elevation
 
 if __name__ == '__main__':
     parser = ArgumentParser()

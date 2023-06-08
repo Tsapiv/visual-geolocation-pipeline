@@ -1,4 +1,4 @@
-from typing import List, Iterable
+from typing import Iterable
 
 import numpy as np
 from scipy.sparse.csgraph import connected_components

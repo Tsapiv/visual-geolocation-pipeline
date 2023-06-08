@@ -7,9 +7,9 @@ import numpy as np
 import yaml
 from tqdm import tqdm
 
-from pysight.common.dataset import Dataset
-from pysight.geoutils import camera_from_metadata
-from pysight.localization.localizer import Localizer
+from geonavpy.common.dataset import Dataset
+from geonavpy.geoutils import camera_from_metadata
+from geonavpy.localization.localizer import Localizer
 
 if __name__ == '__main__':
 

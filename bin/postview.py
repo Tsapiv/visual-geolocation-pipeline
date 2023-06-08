@@ -5,8 +5,8 @@ import matplotlib
 import numpy as np
 import yaml
 
-from pysight.camera import CameraMetadata
-from pysight.dataset import Dataset
+from geonavpy.common.camera import CameraMetadata
+from geonavpy.common.dataset import Dataset
 
 matplotlib.use('TkAgg')
 
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     if opt.credentials is None:
         apikey = ''
     else:
-        apikey = yaml.safe_load(open(opt.credentials))
+        apikey = yaml.safe_load(open(opt.credentials))['api-key']
 
     gmap = gmplot.GoogleMapPlotter(*coords.mean(axis=0), opt.zoom, apikey=apikey)
 

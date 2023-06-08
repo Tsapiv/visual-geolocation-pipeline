@@ -6,7 +6,7 @@ import requests
 import yaml
 from tqdm import tqdm
 
-from ..dataset import Dataset
+from ..common.dataset import Dataset
 from ..utils import sign_url
 
 DEFAULT_WIDTH = 640

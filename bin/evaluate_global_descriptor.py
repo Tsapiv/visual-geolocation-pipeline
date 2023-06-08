@@ -5,10 +5,10 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_distances, euclidean_distances
 from sklearn.model_selection import train_test_split
 
-from pysight.common.camera import CameraMetadata
-from pysight.common.dataset import Dataset
-from pysight.geoutils import extrinsic_from_metadata
-from pysight.matching.utils import angle_error_mat
+from geonavpy.common.camera import CameraMetadata
+from geonavpy.common.dataset import Dataset
+from geonavpy.geoutils import extrinsic_from_metadata
+from geonavpy.matching.utils import angle_error_mat
 
 
 def map_k(y_true: np.ndarray, k: int):

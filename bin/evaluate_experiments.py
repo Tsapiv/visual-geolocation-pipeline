@@ -2,8 +2,8 @@ from pathlib import Path
 
 import numpy as np
 
-from pysight.common.camera import CameraExtrinsic
-from pysight.matching.utils import angle_error_mat
+from geonavpy.common.camera import CameraExtrinsic
+from geonavpy.matching.utils import angle_error_mat
 
 EXPERIMENTS = [
     # Path('test/lviv_center_displacement_policy_no_rerank'),

@@ -58,23 +58,28 @@ def make_retrieval_plot(query_image: np.ndarray, retrieved_images: List[np.ndarr
         cv2.waitKey()
     cv2.destroyAllWindows()
 
+def make_keypoints_plot(image, kpts):
+    out = np.copy(image)
+    kpts = np.round(kpts).astype(int)
+    white = (255, 255, 255)
+    black = (0, 0, 0)
+    for x, y in kpts:
+        cv2.circle(out, (x, y), 4, black, -1, lineType=cv2.LINE_AA)
+        cv2.circle(out, (x, y), 2, white, -1, lineType=cv2.LINE_AA)
+    return out
+
 
 def make_matching_plot(image0, image1, kpts0, kpts1, matches, match_confidences, text=(), path=None,
                        show_keypoints=False, margin=10,
                        opencv_display=False, opencv_title='',
                        small_text=()):
-    if len(image0.shape) > 2:
-        image0 = cv2.cvtColor(image0, cv2.COLOR_BGR2GRAY)
-    if len(image1.shape) > 2:
-        image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
-    H0, W0 = image0.shape
-    H1, W1 = image1.shape
+    H0, W0 = image0.shape[:2]
+    H1, W1 = image1.shape[:2]
     H, W = max(H0, H1), W0 + W1 + margin
 
-    out = 255 * np.ones((H, W), np.uint8)
-    out[:H0, :W0] = image0
-    out[:H1, W0 + margin:] = image1
-    out = np.stack([out] * 3, -1)
+    out = 255 * np.ones((H, W, 3), np.uint8)
+    out[:H0, :W0, :] = image0
+    out[:H1, W0 + margin:, :] = image1
 
     if show_keypoints:
         kpts0, kpts1 = np.round(kpts0).astype(int), np.round(kpts1).astype(int)

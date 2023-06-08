@@ -2,9 +2,9 @@ import json
 import os
 from argparse import ArgumentParser
 
-from pysight.common.camera import CameraMetadata
-from pysight.common.dataset import Dataset
-from pysight.geoutils import intrinsics_from_metadata, relative_extrinsic_from_metadata
+from geonavpy.common.camera import CameraMetadata
+from geonavpy.common.dataset import Dataset
+from geonavpy.geoutils import intrinsics_from_metadata, relative_extrinsic_from_metadata
 
 if __name__ == '__main__':
     parser = ArgumentParser()

@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 
-from pysight.download.panoramas import download_panoramas
+from geonavpy.download.panoramas import download_panoramas
 
 if __name__ == '__main__':
     parser = ArgumentParser()

@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
-from pysight.mapping import sample_lats_lngs
-from pysight.download.metadata import download_metadata
+from geonavpy.mapping import sample_lats_lngs
+from geonavpy.download.metadata import download_metadata
 
 if __name__ == '__main__':
     parser = ArgumentParser()

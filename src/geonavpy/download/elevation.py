@@ -5,7 +5,7 @@ import requests
 import yaml
 from tqdm import tqdm
 
-from ..dataset import Dataset
+from ..common.dataset import Dataset
 
 DATA_REQUEST = 'https://maps.googleapis.com/maps/api/elevation/json?locations={locations}&key={key}'
 

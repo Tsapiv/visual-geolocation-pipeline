@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from pysight.mapping import sample_lats_lngs
+from geonavpy.mapping import sample_lats_lngs
 
 if __name__ == '__main__':
     parser = ArgumentParser()

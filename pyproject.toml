@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 
 [tool.poetry]
-name = "pysight"
+name = "geonavpy"
 version = "0.1.0"
 description = ""
 authors = [
@@ -19,7 +19,7 @@ license = "Proprietary"
 readme = "README.md"
 
 packages = [
-    { include = "pysight", from = "src" }
+    { include = "geonavpy", from = "src" }
 ]
 include = [
     { path = "tests", format = "sdist" }
