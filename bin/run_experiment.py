@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     parser = ArgumentParser()
     parser.add_argument('--reference_set', type=str, required=True, help='Path to reference dataset')
-    parser.add_argument('--descriptor_type', type=str, default='radenovic_gldv1', help='Path to reference dataset')
+    parser.add_argument('--descriptor_type', type=str, default='radenovic_gldv1', help='Type of global descriptor used in retrieval')
     parser.add_argument('--query_set', type=str, required=True, help='Path to query dataset')
     parser.add_argument('--exp_name', type=str, default=None, help='Experiment name')
     parser.add_argument('--conf', type=str, required=True, help='Path to config file')
