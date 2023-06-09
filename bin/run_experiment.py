@@ -38,10 +38,7 @@ if __name__ == '__main__':
             query_image = query_set.image(entry)
             query_camera = camera_from_metadata(query_set.metadata(entry))
 
-            # skip step with descriptor calculation
-            query_descriptor = query_set.descriptor(entry)
-
-            estimated_camera = localizer.localize(query_image, query_camera, query_descriptor)
+            estimated_camera = localizer.localize(query_image, query_camera)
 
             if query_camera.extrinsic is None:
                 gt.append(np.zeros(4, 4))

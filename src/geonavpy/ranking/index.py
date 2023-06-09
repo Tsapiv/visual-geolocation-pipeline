@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 import torch
@@ -35,11 +35,15 @@ class Index:
             torch.concatenate([left_columns, self.__db_similarities], dim=-1)
         ], dim=0)
 
-    def topk(self, query_descriptors: np.ndarray, k: int, rerank: bool = True):
+    def topk(self, query_descriptors: Union[np.ndarray, torch.Tensor], k: int, rerank: bool = True):
+        if isinstance(query_descriptors, np.ndarray):
+            query_descriptors = torch.FloatTensor(query_descriptors)
+        query_descriptors = query_descriptors.to(self.__device)
+
         if len(query_descriptors.shape) == 1:
             query_descriptors = query_descriptors.reshape(1, -1)
-        query_descriptors /= np.linalg.norm(query_descriptors, axis=-1, keepdims=True)
-        query_descriptors = torch.FloatTensor(query_descriptors).to(self.__device)
+        query_descriptors /= torch.norm(query_descriptors, dim=-1, keepdim=True)
+
         if self.__db_descriptors is None:
             self.__prepare_db_descriptors()
 

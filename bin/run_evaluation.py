@@ -45,7 +45,7 @@ if __name__ == '__main__':
             # skip step with descriptor calculation
             query_descriptor = query_set.descriptor(entry)
 
-            estimated_camera = localizer.localize(query_image, query_camera, query_descriptor)
+            estimated_camera = localizer.localize(query_image, query_camera)
 
 
         except Exception as e:

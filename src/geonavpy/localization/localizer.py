@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict
 
 import numpy as np
+import torch
 
 from .pose_estimation import estimate_pose, RP
 from ..common.camera import Camera
@@ -13,6 +14,7 @@ from ..keypoints_matching import match_keypoints
 from ..matching.superglue import SuperGlue
 from ..matching.superpoint import SuperPoint
 from ..ranking.index import Index
+from ..retrieval.global_descriptor import GlobalDescriptor, generate_global_descriptors
 from ..utils import make_retrieval_plot, make_matching_plot
 
 
@@ -39,11 +41,11 @@ class Localizer:
         self.__local_descriptor = SuperPoint()
         self.__matcher = SuperGlue(dict(weights='outdoor'))
         self.__index_db = Index(reference_db)
-        self.__global_descriptor = None
+        self.__global_descriptor = GlobalDescriptor()
+        self.__device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-    def localize(self, query_image: np.ndarray, query_camera: Camera, query_descriptor: Optional[np.ndarray] = None):
-        if query_descriptor is None and self.__global_descriptor is not None:
-            query_descriptor = self.__global_descriptor(query_image)
+    def localize(self, query_image: np.ndarray, query_camera: Camera):
+        query_descriptor = generate_global_descriptors(self.__global_descriptor, query_image, self.__device)
 
         similar_entries = self.__index_db.topk(query_descriptor, self.__config.k, self.__config.rerank)
         cameras = np.asarray(
