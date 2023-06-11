@@ -12,14 +12,14 @@ matplotlib.use('TkAgg')
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--dataset', type=str, required=True, help='Dataset path')
+    parser.add_argument('--database', type=str, required=True, help='Database path')
     parser.add_argument('--credentials', type=str, default=None, help='Path to credentials file')
     parser.add_argument('--zoom', type=int, default=17, help='Starting zoom of the map')
     parser.add_argument('--output', type=str, default='map.html', help='HTML output path')
 
     opt = parser.parse_args()
 
-    dataset = Dataset(opt.dataset)
+    dataset = Dataset(opt.database)
 
     md = list(map(lambda x: CameraMetadata.from_kwargs(**x), dataset.metadata(dataset.entries)))
 

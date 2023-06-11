@@ -10,7 +10,7 @@ from geonavpy.retrieval.global_descriptor import GlobalDescriptor, generate_glob
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--dataset', type=str, required=True, help='Path to dataset')
+    parser.add_argument('--database', type=str, required=True, help='Path to dataset')
     parser.add_argument('--descriptor_type', type=str, default='radenovic_gldv1')
     parser.add_argument('--backbone', type=str, default='resnet101conv5')
     parser.add_argument('--device', type=str, default='cuda')
@@ -22,7 +22,7 @@ if __name__ == '__main__':
     model = GlobalDescriptor(model_type=opt.descriptor_type, backbone=opt.backbone)
 
     model = torch.nn.DataParallel(model)
-    image_files = list(map(lambda x: os.path.join(x.path, 'image.jpg'), os.scandir(opt.dataset)))
+    image_files = list(map(lambda x: os.path.join(x.path, 'image.jpg'), os.scandir(opt.database)))
 
     with torch.no_grad():
         model = model.eval()
